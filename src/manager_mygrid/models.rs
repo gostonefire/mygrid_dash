@@ -1,28 +1,32 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ForecastValues {
-    pub valid_time: DateTime<Local>,
+    #[serde(rename(deserialize = "valid_time"))]
+    pub date_time: DateTime<Local>,
     pub temp: f64,
     pub cloud_factor: f64,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ProductionValues {
-    pub valid_time: DateTime<Local>,
+    #[serde(rename(deserialize = "valid_time"))]
+    pub date_time: DateTime<Local>,
     pub power: f64
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ConsumptionValues {
-    pub valid_time: DateTime<Local>,
+    #[serde(rename(deserialize = "valid_time"))]
+    pub date_time: DateTime<Local>,
     pub power: f64
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TariffValues {
-    pub valid_time: DateTime<Local>,
+    #[serde(rename(deserialize = "valid_time"))]
+    pub date_time: DateTime<Local>,
     pub buy: f64,
     pub sell: f64,
 }
@@ -36,7 +40,7 @@ pub struct BaseData {
     pub tariffs: Vec<TariffValues>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Block {
     pub block_type: String,
     pub start_time: DateTime<Local>,

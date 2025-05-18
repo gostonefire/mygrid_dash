@@ -88,3 +88,9 @@ impl From<FoxError> for DispatcherError {
 impl From<chrono::format::ParseError> for DispatcherError {
     fn from(e: chrono::format::ParseError) -> Self { DispatcherError(e.to_string()) }
 }
+impl From<chrono::round::RoundingError> for DispatcherError {
+    fn from(e: chrono::round::RoundingError) -> Self { DispatcherError(e.to_string()) }
+}
+impl From<serde_json::Error> for DispatcherError {
+    fn from(e: serde_json::Error) -> Self { DispatcherError(e.to_string()) }
+}

@@ -25,7 +25,7 @@ struct Params {
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
-    rx_from_mygrid: UnboundedReceiver<Cmd>,
+    rx_from_mygrid: UnboundedReceiver<String>,
 }
 
 struct AppState {
@@ -37,11 +37,48 @@ async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Res
     HttpResponse::Ok().body("Access granted!")
 }
 
+#[get("/soc_history")]
+async fn soc_history(data: web::Data<AppState>) -> impl Responder {
+    let mut comms = data.comms.lock().unwrap();
+    comms.tx_to_mygrid.send(Cmd::SocHistory(None)).unwrap();
+
+    if let Some(json) = comms.rx_from_mygrid.recv().await {
+        HttpResponse::Ok().body(json)             
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+}
+
+#[get("/soc_current")]
+async fn soc_current(data: web::Data<AppState>) -> impl Responder {
+    let mut comms = data.comms.lock().unwrap();
+    comms.tx_to_mygrid.send(Cmd::Soc(None)).unwrap();
+
+    if let Some(json) = comms.rx_from_mygrid.recv().await {
+        HttpResponse::Ok().body(json)
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+}
+
+#[get("/est_production")]
+async fn est_production(data: web::Data<AppState>) -> impl Responder {
+    let mut comms = data.comms.lock().unwrap();
+    comms.tx_to_mygrid.send(Cmd::EstProduction(None)).unwrap();
+
+    if let Some(json) = comms.rx_from_mygrid.recv().await {
+        HttpResponse::Ok().body(json)
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+}
+
+
 #[actix_web::main]
 async fn main() -> Result<(), UnrecoverableError> {
     // Set up communication channels
     let (tx_to_mygrid, rx_from_web) = mpsc::unbounded_channel::<Cmd>();
-    let (tx_to_web, rx_from_mygrid) = mpsc::unbounded_channel::<Cmd>();
+    let (tx_to_web, rx_from_mygrid) = mpsc::unbounded_channel::<String>();
     let comms = Arc::new(Mutex::new(Comms{tx_to_mygrid,rx_from_mygrid,}));
     
     // Load configuration
@@ -59,6 +96,9 @@ async fn main() -> Result<(), UnrecoverableError> {
         App::new()
             .app_data(web::Data::new(AppState {comms: comms.clone()}))
             .service(code)
+            .service(soc_history)
+            .service(soc_current)
+            .service(est_production)
     })
         .workers(4)
         .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?

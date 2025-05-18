@@ -1,7 +1,7 @@
 use std::ops::Add;
-use actix_web::cookie::time::format_description::well_known::iso8601::FormattedComponents::Time;
 use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
 use log::{error, info};
+use serde::Serialize;
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::DispatcherError;
@@ -10,24 +10,40 @@ use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::{BaseData, Block};
 
+#[derive(Debug)]
 pub enum Cmd {
-    Soc(Option<u8>),
-    SocHistory(Option<Vec<DatedData>>),
-    Production(Option<f64>),
-    ProductionHistory(Option<Vec<DatedData>>),
-    Load(Option<f64>),
-    LoadHistory(Option<Vec<DatedData>>),
-    EstProduction(Option<Vec<DatedData>>),
-    EstLoad(Option<Vec<DatedData>>),
-    Schema(Option<Vec<Block>>),
+    Soc(Option<String>),
+    SocHistory(Option<String>),
+    Production(Option<String>),
+    ProductionHistory(Option<String>),
+    Load(Option<String>),
+    LoadHistory(Option<String>),
+    EstProduction(Option<String>),
+    EstLoad(Option<String>),
+    Schedule(Option<String>),
+    Forecast(Option<String>),
+    Tariffs(Option<String>),
     NoOp,
 }
 
-#[derive(Clone)]
-pub struct DatedData {
-    pub date_time: DateTime<Local>,
-    pub timestamp: i64,
-    pub data: f64,
+#[derive(Serialize)]
+struct Soc {
+    soc: u8,
+    #[serde(skip)]
+    timestamp: i64,
+}
+
+#[derive(Serialize)]
+struct History<T> {
+    date_time: Vec<DateTime<Local>>,
+    data: Vec<T>,
+}
+
+pub struct HistoryData {
+    soc_history: History<u8>,
+    production_history: History<f64>,
+    load_history: History<f64>,
+    last_history_time: DateTime<Local>
 }
 
 /// Sync start point
@@ -39,7 +55,7 @@ pub struct DatedData {
 /// * 'tx' - mpsc sender to the web server
 /// * 'rx' - mpsc receiver from the web server
 /// * 'config' - configuration struct
-pub async fn run(tx: UnboundedSender<Cmd>,  rx: UnboundedReceiver<Cmd>, config: &Config) {
+pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, config: &Config) {
     let mut disp = match Dispatcher::new(tx, rx, config).await {
         Ok(d) => d,
         Err(e) => { error!("while initializing dispatcher: {}", e); return; }
@@ -58,18 +74,15 @@ pub async fn run(tx: UnboundedSender<Cmd>,  rx: UnboundedReceiver<Cmd>, config: 
 /// Dispatcher struct
 ///
 struct Dispatcher {
-    tx: UnboundedSender<Cmd>,
+    tx: UnboundedSender<String>,
     rx: UnboundedReceiver<Cmd>,
     schedule: Vec<Block>,
     base_data: BaseData,
     fox_cloud: Fox,
     schedule_path: String,
     base_data_path: String,
-    current_soc: Option<DatedData>,
-    soc_history: Option<Vec<DatedData>>,
-    production_history: Option<Vec<DatedData>>,
-    load_history: Option<Vec<DatedData>>,
-    last_history_time: Option<DateTime<Local>>
+    current_soc: Option<Soc>,
+    history_data: Option<HistoryData>,
 }
 
 impl Dispatcher {
@@ -80,7 +93,7 @@ impl Dispatcher {
     /// * 'tx' - mpsc sender to the web server
     /// * 'rx' - mpsc receiver from the web server
     /// * 'config' - configuration struct
-    async fn new(tx: UnboundedSender<Cmd>, rx: UnboundedReceiver<Cmd>, config: &Config) -> Result<Self, DispatcherError> {
+    async fn new(tx: UnboundedSender<String>, rx: UnboundedReceiver<Cmd>, config: &Config) -> Result<Self, DispatcherError> {
         let schedule = get_schedule(&config.mygrid.schedule_path).await?;
         let base_data = get_base_data(&config.mygrid.base_data_path).await?;
         let fox_cloud = Fox::new(&config.fox_ess)?;
@@ -94,10 +107,7 @@ impl Dispatcher {
             schedule_path: config.mygrid.schedule_path.clone(),
             base_data_path: config.mygrid.base_data_path.clone(),
             current_soc: None,
-            soc_history: None,
-            production_history: None,
-            load_history: None,
-            last_history_time: None,
+            history_data: None,
         })
     }
 
@@ -127,21 +137,21 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'cmd' - the command to evaluate and execute
-    async fn execute_cmd(&mut self, cmd: Cmd) -> Result<Cmd, DispatcherError> {
-        let mut data: Cmd = Cmd::NoOp;
-
-        match cmd {
-            Cmd::Soc(_) => { data = Cmd::Soc(Some(self.get_current_soc().await?)) }
-            Cmd::SocHistory(_) => { data = Cmd::SocHistory(Some(self.get_soc_history().await?)) }
-            Cmd::Production(_) => {}
-            Cmd::ProductionHistory(_) => { data = Cmd::ProductionHistory(Some(self.get_production_history().await?)) }
-            Cmd::Load(_) => {}
-            Cmd::LoadHistory(_) => { data = Cmd::LoadHistory(Some(self.get_load_history().await?)) }
-            Cmd::EstProduction(_) => {}
-            Cmd::EstLoad(_) => {}
-            Cmd::Schema(_) => {}
-            Cmd::NoOp => ()
-        }
+    async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String, DispatcherError> {
+        let data = match cmd {
+            Cmd::Soc(_)               => self.get_current_soc().await?,
+            Cmd::SocHistory(_)        => self.get_soc_history().await?,
+            Cmd::Production(_)        => String::new(),
+            Cmd::ProductionHistory(_) => self.get_production_history().await?,
+            Cmd::Load(_)              => String::new(),
+            Cmd::LoadHistory(_)       => self.get_load_history().await?,
+            Cmd::EstProduction(_)     => self.get_est_production()?,
+            Cmd::EstLoad(_)           => self.get_est_load()?,
+            Cmd::Schedule(_)          => self.get_schedule()?,
+            Cmd::Forecast(_)          => self.get_forecast()?,
+            Cmd::Tariffs(_)           => self.get_tariffs()?,
+            Cmd::NoOp                 => String::new(),
+        };
 
         Ok(data)
     }
@@ -149,44 +159,73 @@ impl Dispatcher {
     /// Returns current SoC
     /// If the currently stored SoC is None or to old, a fresh SoC is fetched from FoxESS Cloud
     ///
-    async fn get_current_soc(&mut self) -> Result<u8, DispatcherError> {
+    async fn get_current_soc(&mut self) -> Result<String, DispatcherError> {
         if self.current_soc.is_none() || self.current_soc.as_ref().is_some_and(|s| Utc::now().timestamp() - s.timestamp > 300) {
             let soc = self.fox_cloud.get_current_soc().await?;
-            self.current_soc = Some(DatedData {
-                date_time: Local::now(),
+            self.current_soc = Some(Soc {
+                soc,
                 timestamp: Utc::now().timestamp(),
-                data: soc as f64,
             })
         }
 
-        Ok(self.current_soc.as_ref().map(|s| s.data as u8).unwrap())
+        Ok(serde_json::to_string_pretty(&self.current_soc.as_ref().unwrap())?)
     }
 
     /// Returns soc history since midnight
     /// If needed the history is first updated from FoxESS Cloud
     /// 
-    async fn get_soc_history(&mut self) -> Result<Vec<DatedData>, DispatcherError> {
+    async fn get_soc_history(&mut self) -> Result<String, DispatcherError> {
         self.update_history().await?;
 
-        Ok(self.soc_history.as_ref().unwrap().clone())
+        Ok(serde_json::to_string_pretty(&self.history_data.as_ref().unwrap().soc_history)?)
     }
 
     /// Returns production history since midnight
     /// If needed the history is first updated from FoxESS Cloud
     ///
-    async fn get_production_history(&mut self) -> Result<Vec<DatedData>, DispatcherError> {
+    async fn get_production_history(&mut self) -> Result<String, DispatcherError> {
         self.update_history().await?;
 
-        Ok(self.production_history.as_ref().unwrap().clone())
+        Ok(serde_json::to_string_pretty(&self.history_data.as_ref().unwrap().production_history)?)
     }
 
     /// Returns load history since midnight
     /// If needed the history is first updated from FoxESS Cloud
     ///
-    async fn get_load_history(&mut self) -> Result<Vec<DatedData>, DispatcherError> {
+    async fn get_load_history(&mut self) -> Result<String, DispatcherError> {
         self.update_history().await?;
 
-        Ok(self.load_history.as_ref().unwrap().clone())
+        Ok(serde_json::to_string_pretty(&self.history_data.as_ref().unwrap().production_history)?)
+    }
+
+    /// Returns estimated production for the day
+    /// 
+    fn get_est_production(&mut self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.production)?)
+    }
+
+    /// Returns estimated load for the day
+    ///
+    fn get_est_load(&mut self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.consumption)?)
+    }
+
+    /// Returns current schedule
+    ///
+    fn get_schedule(&mut self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.schedule)?)
+    }
+
+    /// Returns current whether forecast
+    ///
+    fn get_forecast(&mut self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.forecast)?)
+    }
+
+    /// Returns tariffs for the day
+    ///
+    fn get_tariffs(&mut self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.tariffs)?)
     }
 
     /// Updates all history fields with fresh data, either delta since last update or
@@ -194,67 +233,60 @@ impl Dispatcher {
     /// 
     async fn update_history(&mut self) -> Result<(), DispatcherError> {
         // Check if update is needed
-        if self.last_history_time
+        if self.history_data
             .as_ref()
             .is_some_and(|l| {
-                Utc::now() - l.with_timezone(&Utc) <= Duration::minutes(5) && l.ordinal0() == Local::now().ordinal0()
+                Utc::now() - l.last_history_time.with_timezone(&Utc) <= Duration::minutes(5) && 
+                    l.last_history_time.ordinal0() == Local::now().ordinal0()
             }){
             
             return Ok(())
         }
         
-        let mut soc_history: Vec<DatedData> = Vec::new();
-        let mut production_history: Vec<DatedData> = Vec::new();
-        let mut load_history: Vec<DatedData> = Vec::new();
-        let mut last_history_time: Option<DateTime<Local>> = None;
+        let mut soc_history: History<u8> = History { date_time: Vec::new(), data: Vec::new() };
+        let mut production_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };
+        let mut load_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };
+        let mut last_history_time: DateTime<Local> = Local::now();
         
-        let mut start: DateTime<Utc> = Local::now().duration_trunc(TimeDelta::days(1)).unwrap().with_timezone(&Utc);
-        if let Some(lht) = self.last_history_time {
-            if lht.ordinal0() == Local::now().ordinal0() {
-                start = lht.add(TimeDelta::seconds(1)).with_timezone(&Utc);
-                soc_history = self.soc_history.take().unwrap();
-                production_history = self.production_history.take().unwrap();
-                load_history = self.load_history.take().unwrap();
-                last_history_time = Some(lht);
+        let mut start = Local::now().duration_trunc(TimeDelta::days(1))?.with_timezone(&Utc);
+        if let Some(hd) = &self.history_data {
+            if hd.last_history_time.ordinal0() == Local::now().ordinal0() {
+                let hd = self.history_data.take().unwrap(); 
+                start = hd.last_history_time.add(TimeDelta::seconds(1)).with_timezone(&Utc);
+                soc_history = hd.soc_history;
+                production_history = hd.production_history;
+                load_history = hd.load_history;
+                last_history_time = hd.last_history_time;
             }
         }
         let end =  Local::now().with_timezone(&Utc);
 
-        if end - start < TimeDelta::minutes(10) {
-            self.soc_history = Some(soc_history);
-            self.production_history = Some(production_history);
-            self.load_history = Some(load_history);
-            self.last_history_time = last_history_time;
-        } else {
+        if end - start >= TimeDelta::minutes(10) {
             let history = self.fox_cloud.get_device_history_data(start, end).await?;
             
             for (i, time) in history.time.iter().enumerate() {
-                let naive_date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S")?;
-                let timestamp = naive_date_time.and_utc().timestamp();
+                let naive_date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?;
                 let date_time = naive_date_time.and_local_timezone(Local).unwrap();
                 
-                soc_history.push(DatedData {
-                    date_time,
-                    timestamp,
-                    data: history.soc[i] as f64,
-                });
-                production_history.push(DatedData {
-                    date_time,
-                    timestamp,
-                    data: history.pv_power[i],
-                });
-                load_history.push(DatedData {
-                    date_time,
-                    timestamp,
-                    data: history.ld_power[i],
-                });
-                last_history_time = Some(date_time);
+                soc_history.data.push(history.soc[i]);
+                soc_history.date_time.push(date_time);
+
+                production_history.data.push(history.pv_power[i]);
+                production_history.date_time.push(date_time);
+
+                load_history.data.push(history.ld_power[i]);
+                load_history.date_time.push(date_time);
+
+                last_history_time = date_time;
             }
-            self.soc_history = Some(soc_history);
-            self.production_history = Some(production_history);
-            self.load_history = Some(load_history);
-            self.last_history_time = last_history_time;
         }
+
+        self.history_data = Some(HistoryData {
+            soc_history,
+            production_history,
+            load_history,
+            last_history_time,
+        });
 
         Ok(())
     }
