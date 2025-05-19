@@ -20,13 +20,20 @@ pub fn setup_logger(log_path: &str, log_to_stdout: bool) -> Result<(), ConfigErr
         .encoder(Box::new(PatternEncoder::new("[{d(%Y-%m-%dT%H:%M:%S):0<19}{d(%:z)} {l} {M}] - {m}{n}")))
         .build(log_path)?;
 
+    let mut appenders: Vec<&str> = vec!["file"];
+    let mut builder = log4rs::Config::builder()
+        .appender(Appender::builder().build("file", Box::new(file)));
 
-    let config = log4rs::Config::builder()
-        .appender(Appender::builder().build("file", Box::new(file)))
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+    
+    if log_to_stdout {
+        appenders.push("stdout");
+        builder = builder
+            .appender(Appender::builder().build("stdout", Box::new(stdout)));
+    }
+
+    let config = builder
         .build(Root::builder()
-            .appenders(["file","stdout"]).build(LevelFilter::Info)
-
+            .appenders(appenders).build(LevelFilter::Info)
         )?;
 
     let _ = log4rs::init_config(config)?;
