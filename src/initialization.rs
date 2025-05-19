@@ -26,6 +26,7 @@ pub struct MyGrid {
 #[derive(Deserialize, Clone)]
 pub struct General {
     pub log_path: String,
+    pub log_to_stdout: bool,
 }
 
 #[derive(Deserialize, Clone)]
@@ -50,7 +51,7 @@ pub fn config() -> Result<Config, ConfigError> {
     
     let config = load_config(&config_path)?;
 
-    setup_logger(&config.general.log_path)?;
+    setup_logger(&config.general.log_path, config.general.log_to_stdout)?;
 
     Ok(config)
 }

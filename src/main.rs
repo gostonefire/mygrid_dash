@@ -1,15 +1,15 @@
 use std::sync::{Arc, Mutex};
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpServer};
 use log::info;
 use rustls::ServerConfig;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use rustls_pki_types::pem::PemObject;
-use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::UnrecoverableError;
-use crate::initialization::{config, Config, WebServerParameters};
+use crate::initialization::{config, WebServerParameters};
 use crate::dispatcher::{run, Cmd};
+use crate::handlers::{est_production, soc_current, soc_history};
 
 mod errors;
 mod initialization;
@@ -17,11 +17,7 @@ mod logging;
 mod manager_fox_cloud;
 mod manager_mygrid;
 mod dispatcher;
-
-#[derive(Deserialize)]
-struct Params {
-    code: String,
-}
+mod handlers;
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
@@ -31,48 +27,6 @@ struct Comms {
 struct AppState {
     comms: Arc<Mutex<Comms>>,
 }
-
-#[get("/code")]
-async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Responder {
-    HttpResponse::Ok().body("Access granted!")
-}
-
-#[get("/soc_history")]
-async fn soc_history(data: web::Data<AppState>) -> impl Responder {
-    let mut comms = data.comms.lock().unwrap();
-    comms.tx_to_mygrid.send(Cmd::SocHistory(None)).unwrap();
-
-    if let Some(json) = comms.rx_from_mygrid.recv().await {
-        HttpResponse::Ok().body(json)             
-    } else {
-        HttpResponse::NoContent().finish()
-    }
-}
-
-#[get("/soc_current")]
-async fn soc_current(data: web::Data<AppState>) -> impl Responder {
-    let mut comms = data.comms.lock().unwrap();
-    comms.tx_to_mygrid.send(Cmd::Soc(None)).unwrap();
-
-    if let Some(json) = comms.rx_from_mygrid.recv().await {
-        HttpResponse::Ok().body(json)
-    } else {
-        HttpResponse::NoContent().finish()
-    }
-}
-
-#[get("/est_production")]
-async fn est_production(data: web::Data<AppState>) -> impl Responder {
-    let mut comms = data.comms.lock().unwrap();
-    comms.tx_to_mygrid.send(Cmd::EstProduction(None)).unwrap();
-
-    if let Some(json) = comms.rx_from_mygrid.recv().await {
-        HttpResponse::Ok().body(json)
-    } else {
-        HttpResponse::NoContent().finish()
-    }
-}
-
 
 #[actix_web::main]
 async fn main() -> Result<(), UnrecoverableError> {
@@ -95,7 +49,6 @@ async fn main() -> Result<(), UnrecoverableError> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(AppState {comms: comms.clone()}))
-            .service(code)
             .service(soc_history)
             .service(soc_current)
             .service(est_production)

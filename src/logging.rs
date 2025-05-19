@@ -1,3 +1,4 @@
+use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
@@ -9,17 +10,22 @@ use crate::errors::ConfigError;
 /// # Arguments
 ///
 /// * 'log_path' - path where to save logs
-pub fn setup_logger(log_path: &str) -> Result<(), ConfigError> {
+/// * 'log_to_stdout' - whether to log to stdout or not
+pub fn setup_logger(log_path: &str, log_to_stdout: bool) -> Result<(), ConfigError> {
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("[{d(%Y-%m-%dT%H:%M:%S):0<19}{d(%:z)} {l} {M}] - {m}{n}")))
+        .build();
 
     let file = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{d(%Y-%m-%dT%H:%M:%S%.f):0<29}{d(%:z)} {l} {M}] - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new("[{d(%Y-%m-%dT%H:%M:%S):0<19}{d(%:z)} {l} {M}] - {m}{n}")))
         .build(log_path)?;
 
 
     let config = log4rs::Config::builder()
         .appender(Appender::builder().build("file", Box::new(file)))
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .build(Root::builder()
-            .appenders(["file"]).build(LevelFilter::Info)
+            .appenders(["file","stdout"]).build(LevelFilter::Info)
 
         )?;
 

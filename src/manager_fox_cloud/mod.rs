@@ -3,7 +3,7 @@ mod models;
 
 use std::str::FromStr;
 use std::time::Duration;
-use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
@@ -79,7 +79,7 @@ impl Fox {
         let json = self.post_request(&path, req_json).await?;
 
         let fox_data: DeviceHistoryResult = serde_json::from_str(&json)?;
-        let device_history = transform_history_data(start.with_timezone(&Local).date_naive(), fox_data.result)?;
+        let device_history = transform_history_data(fox_data.result)?;
 
         Ok(device_history)
     }
@@ -153,9 +153,8 @@ impl Fox {
 ///
 /// # Arguments
 ///
-/// * 'date' - the date the data is valid for
 /// * 'input' - the data to transform
-fn transform_history_data(date: NaiveDate, input: Vec<DeviceHistoryData>) -> Result<DeviceHistory, FoxError> {
+fn transform_history_data(input: Vec<DeviceHistoryData>) -> Result<DeviceHistory, FoxError> {
     let mut time: Vec<String> = Vec::new();
     let mut pv_power: Vec<f64> = Vec::new();
     let mut ld_power: Vec<f64> = Vec::new();
@@ -182,7 +181,6 @@ fn transform_history_data(date: NaiveDate, input: Vec<DeviceHistoryData>) -> Res
     }
 
     Ok(DeviceHistory {
-        date,
         time,
         pv_power,
         ld_power,
