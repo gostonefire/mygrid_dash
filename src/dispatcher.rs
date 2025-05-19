@@ -155,7 +155,7 @@ impl Dispatcher {
     ///
     async fn get_current_soc(&mut self) -> Result<String, DispatcherError> {
         if self.current_soc.is_none() || self.current_soc.as_ref().is_some_and(|s| Utc::now().timestamp() - s.timestamp > 300) {
-            info!("Fetching SoC from FoxESS Cloud");
+            info!("fetching SoC from FoxESS Cloud");
             let soc = self.fox_cloud.get_current_soc().await?;
             self.current_soc = Some(Soc {
                 soc,
@@ -238,7 +238,7 @@ impl Dispatcher {
             return Ok(())
         }
 
-        info!("Fetching SoC, pvPower and loadsPower from FoxESS Cloud");
+        info!("fetching SoC, pvPower and loadsPower history from FoxESS Cloud");
         let mut soc_history: History<u8> = History { date_time: Vec::new(), data: Vec::new() };
         let mut production_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };
         let mut load_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };

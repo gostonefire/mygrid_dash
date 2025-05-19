@@ -43,8 +43,8 @@ async fn main() -> Result<(), UnrecoverableError> {
     let c = config.clone();
     tokio::spawn(async move { run(tx_to_web, rx_from_web, &c).await });
     
-    // Authentication/authorization function
-    info!("starting authentication/authorization function");
+    // Web server
+    info!("starting web server");
     let rustls_config = load_rustls_config(&config.web_server)?;
     HttpServer::new(move || {
         App::new()
