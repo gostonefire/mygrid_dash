@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::ops::Add;
 use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
 use log::{error, info};
@@ -44,8 +45,10 @@ struct HistoryData {
 
 struct RealTimeData {
     soc: u8,
-    production: Vec<f64>,
-    load: Vec<f64>,
+    production: f64,
+    load: f64,
+    prod_data: VecDeque<f64>,
+    load_data: VecDeque<f64>,
     timestamp: i64,
 }
 
@@ -158,8 +161,10 @@ impl Dispatcher {
             },
             real_time_data: RealTimeData {
                 soc: 0,
-                production: Vec::new(),
-                load: Vec::new(),
+                production: 0.0,
+                load: 0.0,
+                prod_data: VecDeque::new(),
+                load_data: VecDeque::new(),
                 timestamp: 0,
             },
             last_request: 0,
@@ -204,22 +209,7 @@ impl Dispatcher {
     /// Returns the weighted moving average production over the stored real time data points
     ///
     fn get_current_production(&self) -> Result<String, DispatcherError> {
-        let mut prod = DataPoint { data: 0.0 };
-
-        let len = self.real_time_data.production.len();
-        
-        if len != 0 {
-            let sum = self.real_time_data.production
-                .iter()
-                .enumerate()
-                .map(|(i, &d)| (i+1) as f64 * d)
-                .sum::<f64>();
-            let denom = ((len * len + len) / 2) as f64;
-            prod.data = sum / denom;
-            info!("production vec: {:?}, sum: {}, denom: {}", self.real_time_data.production, sum, denom);
-        }
-        
-        Ok(serde_json::to_string_pretty(&prod)?)
+        Ok(serde_json::to_string_pretty(&DataPoint{ data: self.real_time_data.production})?)
     }
 
     /// Returns production history since midnight
@@ -231,17 +221,7 @@ impl Dispatcher {
     /// Returns the weighted moving average load over the stored real time data points
     /// 
     fn get_current_load(&self) -> Result<String, DispatcherError> {
-        let mut load = DataPoint { data: 0.0 };
-        
-        if self.real_time_data.load.len() != 0 {
-            let acc = &self.real_time_data.load
-                .iter()
-                .enumerate()
-                .fold((0, 0.0), |acc, (i, load)| (acc.0 + i + 1, acc.1 + load * (i + 1) as f64));
-            load.data = acc.1 / acc.0 as f64;
-        }
-        
-        Ok(serde_json::to_string_pretty(&load)?)
+        Ok(serde_json::to_string_pretty(&DataPoint{ data: self.real_time_data.load})?)
     }
     
     /// Returns load history since midnight
@@ -397,17 +377,25 @@ impl Dispatcher {
             
         info!("updating real time data");
         if timestamp - self.real_time_data.timestamp > 600 {
-            self.real_time_data.production = Vec::new();
-            self.real_time_data.load = Vec::new();
-        } else {
-            self.real_time_data.production = self.real_time_data.production.iter().rev().take(2).rev().map(|&d| d).collect::<Vec<f64>>();
-            self.real_time_data.load = self.real_time_data.load.iter().rev().take(2).rev().map(|&d| d).collect::<Vec<f64>>();
+            self.real_time_data.prod_data = VecDeque::new();
+            self.real_time_data.load_data = VecDeque::new();
         }
 
         let real_time_data = self.fox_cloud.get_device_real_time_data().await?;
         self.real_time_data.soc = real_time_data.soc;
-        self.real_time_data.production.push(real_time_data.pv_power);
-        self.real_time_data.load.push(real_time_data.ld_power);
+        
+        if self.real_time_data.prod_data.len() == 3 {
+            self.real_time_data.prod_data.pop_front();
+        }
+        self.real_time_data.prod_data.push_back(real_time_data.pv_power);
+        self.real_time_data.production = get_wma(&self.real_time_data.prod_data);
+        
+        if self.real_time_data.load_data.len() == 3 {
+            self.real_time_data.load_data.pop_front();
+        }
+        self.real_time_data.load_data.push_back(real_time_data.ld_power);
+        self.real_time_data.load = get_wma(&self.real_time_data.load_data);
+        
         self.real_time_data.timestamp = timestamp;
         
         Ok(())
@@ -430,5 +418,26 @@ impl Dispatcher {
         }
         
         Ok(())
+    }
+}
+
+/// Returns the weighted moving average from the given vector
+/// If the given vector is empty a 0.0 is returned
+/// 
+/// # Arguments
+/// 
+/// * 'vec_in' - vector to calculate wma for
+fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
+    let len = vec_in.len();
+    if len != 0 {
+        let sum = vec_in
+            .iter()
+            .enumerate()
+            .map(|(i, &d)| (i+1) as f64 * d)
+            .sum::<f64>();
+        let denom = ((len * len + len) / 2) as f64;
+        sum / denom
+    } else {
+        0.0
     }
 }
