@@ -373,7 +373,7 @@ impl Dispatcher {
     /// 
     async fn update_real_time_data(&mut self) -> Result<(), DispatcherError> {
         let timestamp = Utc::now().timestamp();
-        if timestamp - self.real_time_data.timestamp < 300 { return Ok(())}
+        if timestamp - self.real_time_data.timestamp < 180 { return Ok(())}
             
         info!("updating real time data");
         if timestamp - self.real_time_data.timestamp > 600 {
@@ -407,7 +407,7 @@ impl Dispatcher {
     /// 
     /// * 'reset_last_request' - whether to reset or not
     async fn check_updates(&mut self, reset_last_request: bool) -> Result<(), DispatcherError> {
-        info!("Checking for FoxESS updates");
+        info!("checking for FoxESS updates");
         if reset_last_request {
             self.last_request = Utc::now().timestamp();
         }
