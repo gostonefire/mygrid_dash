@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::Error;
 use serde_json::Value;
@@ -10,6 +11,11 @@ pub struct RequestDeviceHistoryData {
     pub end: i64,
 }
 
+#[derive(Serialize)]
+pub struct RequestDeviceRealTimeData {
+    pub variables: Vec<String>,
+    pub sns: Vec<String>,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Data {
@@ -35,8 +41,8 @@ pub struct DeviceHistoryResult {
     pub result: Vec<DeviceHistoryData>,
 }
 
-#[derive(Debug)]
 pub struct DeviceHistory {
+    pub last_end_time: DateTime<Utc>,
     pub time: Vec<String>,
     pub pv_power: Vec<f64>,
     pub ld_power: Vec<f64>,
@@ -56,30 +62,25 @@ where D: Deserializer<'de> {
     Ok(x)
 }
 
-
 #[derive(Deserialize)]
-pub struct SocCurrentResult {
-    pub result: Vec<SocCurrentVariables>,
+pub struct DeviceRealTimeResult {
+    pub result: Vec<RealTimeVariables>,
 }
 
 #[derive(Deserialize)]
-pub struct SocCurrentVariables {
-    pub datas: Vec<SocCurrentData>,
-    //pub time: String,
-    //#[serde(rename = "deviceSN")]
-    //pub device_sn: String,
+pub struct RealTimeVariables {
+    pub datas: Vec<RealTimeData>,
 }
 
 #[derive(Deserialize)]
-pub struct SocCurrentData {
-    //pub unit: String,
-    //pub name: String,
-    //pub variable: String,
+pub struct RealTimeData {
+    pub variable: String,
+    #[serde(deserialize_with = "deserialize_scientific_notation")]
     pub value: f64,
 }
 
-#[derive(Serialize)]
-pub struct RequestCurrentSoc {
-    pub sn: String,
-    pub variables: Vec<String>,
+pub struct DeviceRealTime {
+    pub pv_power: f64,
+    pub ld_power: f64,
+    pub soc: u8,
 }

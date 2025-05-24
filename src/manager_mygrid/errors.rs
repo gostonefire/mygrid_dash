@@ -13,3 +13,6 @@ impl From<std::io::Error> for MyGridError {
 impl From<serde_json::Error> for MyGridError {
     fn from(e: serde_json::Error) -> Self { MyGridError(e.to_string()) }
 }
+impl From<chrono::round::RoundingError> for MyGridError {
+    fn from(e: chrono::round::RoundingError) -> Self { MyGridError(e.to_string()) }
+}

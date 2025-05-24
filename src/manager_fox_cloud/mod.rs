@@ -10,8 +10,7 @@ use reqwest::Client;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::initialization::FoxESS;
 use crate::manager_fox_cloud::errors::FoxError;
-use crate::manager_fox_cloud::models::{DeviceHistory, DeviceHistoryData, DeviceHistoryResult, RequestDeviceHistoryData};
-use crate::manager_fox_cloud::models::{SocCurrentResult, RequestCurrentSoc};
+use crate::manager_fox_cloud::models::{DeviceHistory, DeviceHistoryData, DeviceHistoryResult, DeviceRealTime, DeviceRealTimeResult, RequestDeviceHistoryData, RequestDeviceRealTimeData};
 
 const REQUEST_DOMAIN: &str = "https://www.foxesscloud.com";
 
@@ -33,25 +32,6 @@ impl Fox {
             .build()?;
 
         Ok(Self { api_key: config.api_key.to_string(), sn: config.inverter_sn.to_string(), client })
-    }
-
-    /// Obtain the battery current soc (state of charge)
-    ///
-    /// See https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html#get20device20real-time20data0a3ca20id3dget20device20real-time20data4303e203ca3e
-    ///
-    /// # Arguments
-    ///
-    pub async fn get_current_soc(&self) -> Result<u8, FoxError> {
-        let path = "/op/v0/device/real/query";
-
-        let req = RequestCurrentSoc { sn: self.sn.clone(), variables: vec!["SoC".to_string()] };
-        let req_json = serde_json::to_string(&req)?;
-
-        let json = self.post_request(&path, req_json).await?;
-
-        let fox_data: SocCurrentResult = serde_json::from_str(&json)?;
-
-        Ok(fox_data.result[0].datas[0].value.round() as u8)
     }
 
     /// Obtain history data from the inverter
@@ -79,9 +59,47 @@ impl Fox {
         let json = self.post_request(&path, req_json).await?;
 
         let fox_data: DeviceHistoryResult = serde_json::from_str(&json)?;
-        let device_history = transform_history_data(fox_data.result)?;
+        let device_history = transform_history_data(end, fox_data.result)?;
 
         Ok(device_history)
+    }
+
+    /// Obtain real time data from the inverter
+    ///
+    /// See https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html#get20device20real-time20data0a3ca20id3dget20device20real-time20data5603e203ca3e
+    ///
+    pub async fn get_device_real_time_data(&self) -> Result<DeviceRealTime, FoxError> {
+        let path = "/op/v1/device/real/query";
+
+        let req = RequestDeviceRealTimeData {
+            variables: ["pvPower", "loadsPower", "SoC"]
+                .iter().map(|s| s.to_string())
+                .collect::<Vec<String>>(),
+            sns: vec![self.sn.clone()],
+        };
+
+        let req_json = serde_json::to_string(&req)?;
+
+        let json = self.post_request(&path, req_json).await?;
+
+        let fox_data: DeviceRealTimeResult = serde_json::from_str(&json)?;
+
+        let mut device_real_time = DeviceRealTime {
+            pv_power: 0.0,
+            ld_power: 0.0,
+            soc: 0,
+        };
+        
+        for data in fox_data.result[0].datas.iter() {
+            match data.variable.as_str() {
+                "pvPower" => device_real_time.pv_power = data.value * 1000.0,
+                "loadsPower" => device_real_time.ld_power = data.value * 1000.0,
+                "SoC" => device_real_time.soc = data.value.round() as u8,
+                _ => (),
+            }
+        }
+        
+        Ok(device_real_time)
     }
 
     /// Builds a request and sends it as a POST.
@@ -153,8 +171,9 @@ impl Fox {
 ///
 /// # Arguments
 ///
+/// * 'last_end_time' - the last given end time when requesting history data
 /// * 'input' - the data to transform
-fn transform_history_data(input: Vec<DeviceHistoryData>) -> Result<DeviceHistory, FoxError> {
+fn transform_history_data(last_end_time: DateTime<Utc>, input: Vec<DeviceHistoryData>) -> Result<DeviceHistory, FoxError> {
     let mut time: Vec<String> = Vec::new();
     let mut pv_power: Vec<f64> = Vec::new();
     let mut ld_power: Vec<f64> = Vec::new();
@@ -181,6 +200,7 @@ fn transform_history_data(input: Vec<DeviceHistoryData>) -> Result<DeviceHistory
     }
 
     Ok(DeviceHistory {
+        last_end_time,
         time,
         pv_power,
         ld_power,

@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::UnrecoverableError;
 use crate::initialization::{config, WebServerParameters};
 use crate::dispatcher::{run, Cmd};
-use crate::handlers::{est_production, soc_current, soc_history};
+use crate::handlers::{est_load, est_production, forecast, load, load_history, production, production_history, schedule, soc, soc_history, tariffs};
 
 mod errors;
 mod initialization;
@@ -31,35 +31,51 @@ struct AppState {
 #[actix_web::main]
 async fn main() -> Result<(), UnrecoverableError> {
     // Set up communication channels
-    let (tx_to_mygrid, rx_from_web) = mpsc::unbounded_channel::<Cmd>();
-    let (tx_to_web, rx_from_mygrid) = mpsc::unbounded_channel::<String>();
+    let (mut tx_to_mygrid, mut rx_from_web) = mpsc::unbounded_channel::<Cmd>();
+    let (mut tx_to_web, mut rx_from_mygrid) = mpsc::unbounded_channel::<String>();
     let comms = Arc::new(Mutex::new(Comms{tx_to_mygrid,rx_from_mygrid,}));
     
     // Load configuration
     let config = config()?;
 
-    // Main dispatch function
-    info!("starting main dispatch function");
-    let c = config.clone();
-    tokio::spawn(async move { run(tx_to_web, rx_from_web, &c).await });
-    
     // Web server
     info!("starting web server");
+    let web_comms = comms.clone();
     let rustls_config = load_rustls_config(&config.web_server)?;
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(AppState {comms: comms.clone()}))
-            .service(soc_history)
-            .service(soc_current)
-            .service(est_production)
-    })
-        .workers(4)
-        .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
-        .run()
-        .await?;
+    tokio::spawn(HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(AppState {comms: web_comms.clone()}))
+                .service(soc_history)
+                .service(soc)
+                .service(production)
+                .service(production_history)
+                .service(load)
+                .service(load_history)
+                .service(est_production)
+                .service(est_load)
+                .service(schedule)
+                .service(forecast)
+                .service(tariffs)
+        })
+            .workers(4)
+            .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
+            //.bind(("127.0.0.1", 8080))?
+            .run());
 
-    Ok(())
+    // Main dispatch function
+    info!("starting main dispatch function");
+    loop {
+        run(tx_to_web, rx_from_web, &config).await;
 
+        info!("restarting main dispatch function");
+        (tx_to_mygrid, rx_from_web) = mpsc::unbounded_channel::<Cmd>();
+        (tx_to_web, rx_from_mygrid) = mpsc::unbounded_channel::<String>();
+        {
+            let mut disp_comms = comms.lock().unwrap();
+            disp_comms.tx_to_mygrid = tx_to_mygrid;
+            disp_comms.rx_from_mygrid = rx_from_mygrid;
+        }
+    }
 }
 
 /// Loads TLS certificates
