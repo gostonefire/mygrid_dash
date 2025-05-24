@@ -18,6 +18,7 @@ mod manager_fox_cloud;
 mod manager_mygrid;
 mod dispatcher;
 mod handlers;
+mod serializer_time;
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,

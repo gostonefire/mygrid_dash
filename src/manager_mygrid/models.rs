@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use crate::manager_mygrid::errors::MyGridError;
+use crate::serializer_time;
 
 #[derive(Deserialize)]
 pub struct ForecastValues {
@@ -54,22 +55,30 @@ pub struct Block {
 
 #[derive(Serialize)]
 pub struct Forecast {
+    #[serde(rename(serialize = "time"))]
+    #[serde(with = "serializer_time")]
     pub date_time: Vec<DateTime<Local>>,
     pub temp: Vec<f64>,
     pub cloud_factor: Vec<f64>,
 }
 #[derive(Serialize)]
 pub struct Production {
+    #[serde(rename(serialize = "time"))]
+    #[serde(with = "serializer_time")]
     pub date_time: Vec<DateTime<Local>>,
     pub power: Vec<f64>,
 }
 #[derive(Serialize)]
 pub struct Consumption {
+    #[serde(rename(serialize = "time"))]
+    #[serde(with = "serializer_time")]
     pub date_time: Vec<DateTime<Local>>,
     pub power: Vec<f64>,
 }
 #[derive(Serialize)]
 pub struct Tariffs {
+    #[serde(rename(serialize = "time"))]
+    #[serde(with = "serializer_time")]
     pub date_time: Vec<DateTime<Local>>,
     pub buy: Vec<f64>,
     pub sell: Vec<f64>,

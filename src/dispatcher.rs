@@ -10,6 +10,7 @@ use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::{Block, Consumption, Forecast, Mygrid, MygridData, Production, Tariffs};
+use crate::serializer_time;
 
 pub enum Cmd {
     Soc,
@@ -32,6 +33,8 @@ struct DataPoint<T> {
 
 #[derive(Serialize, Clone)]
 struct History<T> {
+    #[serde(rename(serialize = "time"))]
+    #[serde(with = "serializer_time")]
     date_time: Vec<DateTime<Local>>,
     data: Vec<T>,
 }
