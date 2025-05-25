@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use actix_files::Files;
 use actix_web::{web, App, HttpServer};
 use log::info;
 use rustls::ServerConfig;
@@ -57,6 +58,7 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(schedule)
                 .service(forecast)
                 .service(tariffs)
+                .service(Files::new("/", "./static").index_file("index.html"))
         })
             .workers(4)
             .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
