@@ -2,15 +2,15 @@ use std::collections::VecDeque;
 use std::ops::Add;
 use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
 use log::{error, info};
-use serde::Serialize;
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::DispatcherError;
 use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
-use crate::manager_mygrid::models::{Block, Consumption, Forecast, Mygrid, MygridData, Production, Tariffs};
-use crate::serializer_time;
+use crate::manager_mygrid::errors::MyGridError;
+use crate::manager_mygrid::models::Block;
+use crate::models::{DataItem, DataPoint, HistoryData, MyGrid, MygridData, RealTimeData, Series};
 
 pub enum Cmd {
     Soc,
@@ -21,39 +21,15 @@ pub enum Cmd {
     LoadHistory,
     EstProduction,
     EstLoad,
+    CombinedProduction,
+    CombinedLoad,
     Schedule,
-    Forecast,
-    Tariffs,
+    ForecastTemp,
+    ForecastCloud,
+    TariffsBuy,
+    TariffsSell,
 }
 
-#[derive(Serialize)]
-struct DataPoint<T> {
-    data: T,
-}
-
-#[derive(Serialize, Clone)]
-struct History<T> {
-    #[serde(rename(serialize = "time"))]
-    #[serde(with = "serializer_time")]
-    date_time: Vec<DateTime<Local>>,
-    data: Vec<T>,
-}
-
-struct HistoryData {
-    soc_history: History<u8>,
-    production_history: History<f64>,
-    load_history: History<f64>,
-    last_end_time: DateTime<Utc>
-}
-
-struct RealTimeData {
-    soc: u8,
-    production: f64,
-    load: f64,
-    prod_data: VecDeque<f64>,
-    load_data: VecDeque<f64>,
-    timestamp: i64,
-}
 
 /// Sync start point
 /// This loop will never end unless some means of stopping it is implemented,but rather
@@ -148,18 +124,20 @@ impl Dispatcher {
             schedule: None,
             base_data: MygridData {
                 date_time: DateTime::default(),
-                forecast: Forecast { date_time: Vec::new(), temp: Vec::new(), cloud_factor: Vec::new() },
-                production: Production { date_time: Vec::new(), power: Vec::new() },
-                consumption: Consumption { date_time: Vec::new(), power: Vec::new() },
-                tariffs: Tariffs { date_time: Vec::new(), buy: Vec::new(), sell: Vec::new() },
+                forecast_temp: Vec::new(),
+                forecast_cloud: Vec::new(),
+                production: Vec::new(),
+                consumption: Vec::new(),
+                tariffs_buy: Vec::new(),
+                tariffs_sell: Vec::new(),
             },
             fox_cloud,
             schedule_path: config.mygrid.schedule_path.clone(),
             base_data_path: config.mygrid.base_data_path.clone(),
             history_data: HistoryData {
-                soc_history: History { date_time: Vec::new(), data: Vec::new() },
-                production_history: History { date_time: Vec::new(), data: Vec::new() },
-                load_history: History { date_time: Vec::new(), data: Vec::new() },
+                soc_history: Vec::new(),
+                production_history: Vec::new(),
+                load_history: Vec::new(),
                 last_end_time: Default::default(),
             },
             real_time_data: RealTimeData {
@@ -181,17 +159,21 @@ impl Dispatcher {
     /// * 'cmd' - the command to evaluate and execute
     async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String, DispatcherError> {
         let data = match cmd {
-            Cmd::Soc               => self.get_current_soc()?,
-            Cmd::SocHistory        => self.get_soc_history()?,
-            Cmd::Production        => self.get_current_production()?,
-            Cmd::ProductionHistory => self.get_production_history()?,
-            Cmd::Load              => self.get_current_load()?,
-            Cmd::LoadHistory       => self.get_load_history()?,
-            Cmd::EstProduction     => self.get_est_production()?,
-            Cmd::EstLoad           => self.get_est_load()?,
-            Cmd::Schedule          => self.get_schedule()?,
-            Cmd::Forecast          => self.get_forecast()?,
-            Cmd::Tariffs           => self.get_tariffs()?,
+            Cmd::Soc                 => self.get_current_soc()?,
+            Cmd::SocHistory          => self.get_soc_history()?,
+            Cmd::Production          => self.get_current_production()?,
+            Cmd::ProductionHistory   => self.get_production_history()?,
+            Cmd::Load                => self.get_current_load()?,
+            Cmd::LoadHistory         => self.get_load_history()?,
+            Cmd::EstProduction       => self.get_est_production()?,
+            Cmd::EstLoad             => self.get_est_load()?,
+            Cmd::CombinedProduction  => self.get_combined_production()?,
+            Cmd::CombinedLoad        => self.get_combined_load()?,
+            Cmd::Schedule            => self.get_schedule()?,
+            Cmd::ForecastTemp        => self.get_forecast_temp()?,
+            Cmd::ForecastCloud       => self.get_forecast_cloud()?,
+            Cmd::TariffsBuy          => self.get_tariffs_buy()?,
+            Cmd::TariffsSell         => self.get_tariffs_sell()?,
         };
 
         Ok(data)
@@ -244,6 +226,42 @@ impl Dispatcher {
     fn get_est_load(&self) -> Result<String, DispatcherError> {
         Ok(serde_json::to_string_pretty(&self.base_data.consumption)?)
     }
+    
+    /// Returns a combined series of estimated production and production history
+    /// 
+    fn get_combined_production(&self) -> Result<String, DispatcherError> {
+        let series: (Series<f64>, Series<f64>) = (
+            Series {
+                name: "Estimated Production".to_string(),
+                chart_type: "area".to_string(),
+                data: &self.base_data.production,
+            },            Series {
+                name: "Production".to_string(),
+                chart_type: "line".to_string(),
+                data: &self.history_data.production_history,
+            },
+        );
+     
+        Ok(serde_json::to_string_pretty(&series)?)
+    }
+
+    /// Returns a combined series of estimated load and load history
+    ///
+    fn get_combined_load(&self) -> Result<String, DispatcherError> {
+        let series: (Series<f64>, Series<f64>) = (
+            Series {
+                name: "Estimated Load".to_string(),
+                chart_type: "area".to_string(),
+                data: &self.base_data.consumption,
+            },            Series {
+                name: "Load".to_string(),
+                chart_type: "line".to_string(),
+                data: &self.history_data.load_history,
+            },
+        );
+
+        Ok(serde_json::to_string_pretty(&series)?)
+    }
 
     /// Returns current schedule
     ///
@@ -251,16 +269,28 @@ impl Dispatcher {
         Ok(serde_json::to_string_pretty(&self.schedule)?)
     }
 
-    /// Returns current whether forecast
+    /// Returns current whether forecast temperature
     ///
-    fn get_forecast(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.forecast)?)
+    fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.forecast_temp)?)
     }
 
-    /// Returns tariffs for the day
+    /// Returns current whether forecast cloud factor
     ///
-    fn get_tariffs(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.tariffs)?)
+    fn get_forecast_cloud(&self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.forecast_cloud)?)
+    }
+
+    /// Returns the buy tariffs for the day
+    ///
+    fn get_tariffs_buy(&self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.tariffs_buy)?)
+    }
+
+    /// Returns the sell tariffs for the day
+    ///
+    fn get_tariffs_sell(&self) -> Result<String, DispatcherError> {
+        Ok(serde_json::to_string_pretty(&self.base_data.tariffs_sell)?)
     }
 
     /// Updates all history fields with fresh data, either delta since last update or
@@ -278,18 +308,16 @@ impl Dispatcher {
         }
 
         info!("updating SoC, pvPower and loadsPower history from FoxESS Cloud");
-        let mut soc_history: History<u8> = History { date_time: Vec::new(), data: Vec::new() };
-        let mut production_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };
-        let mut load_history: History<f64> = History { date_time: Vec::new(), data: Vec::new() };
         let mut last_end_time: DateTime<Utc> = utc_now;
         
-        let mut start = utc_now.duration_trunc(TimeDelta::days(1))?;
+        let mut start = local_now.duration_trunc(TimeDelta::days(1))?.with_timezone(&Utc);
         if self.history_data.last_end_time.ordinal0() == utc_now.ordinal0() {
             start = self.history_data.last_end_time.add(TimeDelta::seconds(1));
-            soc_history = self.history_data.soc_history.clone();
-            production_history = self.history_data.production_history.clone();
-            load_history = self.history_data.load_history.clone();
             last_end_time = self.history_data.last_end_time;
+        } else {
+            self.history_data.soc_history = Vec::new();
+            self.history_data.production_history = Vec::new();
+            self.history_data.load_history = Vec::new();
         }
 
         if utc_now - start >= TimeDelta::minutes(10) {
@@ -298,25 +326,16 @@ impl Dispatcher {
             
             for (i, time) in history.time.iter().enumerate() {
                 let naive_date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?;
+                //let date_time: DateTime<Local> = naive_date_time.and_utc().with_timezone(&Local);
                 let date_time = naive_date_time.and_local_timezone(Local).unwrap();
                 
-                soc_history.data.push(history.soc[i]);
-                soc_history.date_time.push(date_time);
-
-                production_history.data.push(history.pv_power[i]);
-                production_history.date_time.push(date_time);
-
-                load_history.data.push(history.ld_power[i]);
-                load_history.date_time.push(date_time);
+                self.history_data.soc_history.push(DataItem { x: date_time, y: history.soc[i] });
+                self.history_data.production_history.push(DataItem { x: date_time, y: history.pv_power[i] });
+                self.history_data.load_history.push(DataItem { x: date_time, y: history.ld_power[i] });
             }
         }
 
-        self.history_data = HistoryData {
-            soc_history,
-            production_history,
-            load_history,
-            last_end_time,
-        };
+        self.history_data.last_end_time = last_end_time;
 
         Ok(())
     }
@@ -333,37 +352,55 @@ impl Dispatcher {
         let from = local_now.duration_trunc(TimeDelta::days(1))?;
         let to = from.add(TimeDelta::days(1));
         
-        let mut forecast = base_data.forecast.keep(from, to);
-        let mut production = base_data.production.keep(from, to);
-        let mut consumption = base_data.consumption.keep(from, to);
-        let mut tariffs = base_data.tariffs.keep(from, to);
-        
+        let mut forecast_temp = filter_time(&base_data.forecast_temp, from, to);
+        let mut forecast_cloud = filter_time(&base_data.forecast_cloud, from, to);
+        let mut production = filter_time(&base_data.production, from, to);
+        let mut consumption = filter_time(&base_data.consumption, from, to);
+        let mut tariffs_buy = filter_time(&base_data.tariffs_buy, from, to);
+        let mut tariffs_sell = filter_time(&base_data.tariffs_sell, from, to);
+
         let load_start = base_data.date_time.duration_trunc(TimeDelta::hours(1))?;
         
         if self.base_data.date_time.ordinal0() == base_data.date_time.ordinal0() {
-            forecast = self.base_data.forecast
-                .keep(from, load_start)
-                .append_tail(&mut forecast);
-            
-            production = self.base_data.production
-                .keep(from, load_start)
-                .append_tail(&mut production);
+            forecast_temp = append_tail(
+                filter_time(&self.base_data.forecast_temp, from, load_start), 
+                forecast_temp
+            );
 
-            consumption = self.base_data.consumption
-                .keep(from, load_start)
-                .append_tail(&mut consumption);
+            forecast_cloud = append_tail(
+                filter_time(&self.base_data.forecast_cloud, from, load_start),
+                forecast_cloud
+            );
 
-            tariffs = self.base_data.tariffs
-                .keep(from, load_start)
-                .append_tail(&mut tariffs);
+            production = append_tail(
+                filter_time(&self.base_data.production, from, load_start),
+                production
+            );
+
+            consumption = append_tail(
+                filter_time(&self.base_data.consumption, from, load_start),
+                consumption
+            );
+
+            tariffs_buy = append_tail(
+                filter_time(&self.base_data.tariffs_buy, from, load_start),
+                tariffs_buy
+            );
+
+            tariffs_sell = append_tail(
+                filter_time(&self.base_data.tariffs_sell, from, load_start),
+                tariffs_sell
+            );
         };
         
         self.base_data = MygridData {
             date_time: base_data.date_time,
-            forecast: forecast.pad()?,
-            production: production.pad()?,
-            consumption: consumption.pad()?,
-            tariffs: tariffs.pad()?,
+            forecast_temp: pad(forecast_temp, DataItem { x: local_now, y: 0.0 })?,
+            forecast_cloud: pad(forecast_cloud, DataItem { x: local_now, y: 0.0 })?,
+            production: pad(production, DataItem { x: local_now, y: 0.0 })?,
+            consumption: pad(consumption, DataItem { x: local_now, y: 0.0 })?,
+            tariffs_buy: pad(tariffs_buy, DataItem { x: local_now, y: 0.0 })?,
+            tariffs_sell: pad(tariffs_sell, DataItem { x: local_now, y: 0.0 })?,
         };
             
         Ok(())
@@ -443,4 +480,54 @@ fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
     } else {
         0.0
     }
+}
+
+/// Returns a vector with items from the given vector where the date is greater or equal to start
+/// end less than end
+///
+/// # Arguments
+///
+/// * 'vec_in' - the input vector to filter
+/// * 'start' - the start date to compare with
+/// * 'end' - the end date to compare with 
+fn filter_time<T: MyGrid + Clone>(vec_in: &Vec<T>, start: DateTime<Local>, end: DateTime<Local>) -> Vec<T> {
+    vec_in
+        .iter()
+        .filter(|f| f.is_within(start, end))
+        .map(|f| f.clone())
+        .collect::<Vec<T>>()
+}
+
+/// Pads (left) with missing hours from midnight
+/// The value field is set according the given model
+/// 
+/// # Arguments
+/// 
+/// * 'vec_in' - the vector to pad
+/// * 'model' - the model struct which has the date field set to today's date and value fields according to what the padded dates should be set to
+fn pad<T: MyGrid<Item = T>>(mut vec_in: Vec<T>, model: T) -> Result<Vec<T>, MyGridError> {
+    let start = model.date_time_day()?;
+    let mut end = if let Some(t) = vec_in.get(0) {
+        t.date_time_hour()?
+    } else {
+        start.add(TimeDelta::days(1))
+    };
+
+    while start < end {
+        end += TimeDelta::hours(-1);
+        vec_in.insert(0, model.create_new(end));
+    }
+
+    Ok(vec_in)
+}
+
+/// Appends a vector
+/// 
+/// # Arguments
+/// 
+/// * 'this' - the vector to append to
+/// * 'other' - the vector to append 
+fn append_tail<T: MyGrid<Item = T>>(mut this: Vec<T>, mut other: Vec<T>) -> Vec<T> {
+    this.append(&mut other);
+    this
 }

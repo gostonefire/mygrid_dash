@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use actix_files::Files;
 use actix_web::{web, App, HttpServer};
 use log::info;
@@ -10,7 +11,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::UnrecoverableError;
 use crate::initialization::{config, WebServerParameters};
 use crate::dispatcher::{run, Cmd};
-use crate::handlers::{est_load, est_production, forecast, load, load_history, production, production_history, schedule, soc, soc_history, tariffs};
+use crate::handlers::*;
 
 mod errors;
 mod initialization;
@@ -20,6 +21,8 @@ mod manager_mygrid;
 mod dispatcher;
 mod handlers;
 mod serializer_time;
+mod serialize_iso_8601;
+mod models;
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
@@ -55,9 +58,13 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(load_history)
                 .service(est_production)
                 .service(est_load)
+                .service(combined_production)
+                .service(combined_load)
                 .service(schedule)
-                .service(forecast)
-                .service(tariffs)
+                .service(forecast_temp)
+                .service(forecast_cloud)
+                .service(tariffs_buy)
+                .service(tariffs_sell)
                 .service(Files::new("/", "./static").index_file("index.html"))
         })
             .workers(4)
@@ -74,7 +81,7 @@ async fn main() -> Result<(), UnrecoverableError> {
         (tx_to_mygrid, rx_from_web) = mpsc::unbounded_channel::<Cmd>();
         (tx_to_web, rx_from_mygrid) = mpsc::unbounded_channel::<String>();
         {
-            let mut disp_comms = comms.lock().unwrap();
+            let mut disp_comms = comms.lock().await;
             disp_comms.tx_to_mygrid = tx_to_mygrid;
             disp_comms.rx_from_mygrid = rx_from_mygrid;
         }
