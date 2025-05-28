@@ -20,8 +20,7 @@ mod manager_fox_cloud;
 mod manager_mygrid;
 mod dispatcher;
 mod handlers;
-mod serializer_time;
-mod serialize_iso_8601;
+mod serialize_timestamp;
 mod models;
 
 struct Comms {

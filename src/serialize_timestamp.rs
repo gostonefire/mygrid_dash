@@ -1,9 +1,8 @@
 use chrono::{DateTime, Local};
 use serde::{self, Serialize, Serializer};
 
-const FORMAT: &'static str = "%H";
 
-/// Serializer for serde with to serialize a `chrono` DateTime into an ISO 8601 format
+/// Serializer for serde with to serialize a chrono `DateTime<Local>` into a millisecond timestamp (Utc)
 /// This function is not used directly but rather from struct fields with a serde with attribute 
 /// pointing to this module
 ///
@@ -19,6 +18,4 @@ where
     S: Serializer,
 {
     date.naive_local().and_utc().timestamp_millis().serialize(serializer)
-    // let s = format!("{}", date.format(FORMAT));
-    // serializer.serialize_str(&s)
 }

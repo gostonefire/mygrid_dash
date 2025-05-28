@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use chrono::{DateTime, DurationRound, Local, RoundingError, TimeDelta, Utc};
 use serde::Serialize;
-use crate::serialize_iso_8601;
+use crate::serialize_timestamp;
 
 #[derive(Serialize)]
 pub struct DataPoint<T> {
@@ -10,7 +10,7 @@ pub struct DataPoint<T> {
 
 #[derive(Serialize, Clone)]
 pub struct DataItem<T> {
-    #[serde(with = "serialize_iso_8601")]
+    #[serde(with = "serialize_timestamp")]
     pub x: DateTime<Local>,
     pub y: T,
 }

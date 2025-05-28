@@ -1,5 +1,3 @@
-use std::ops::Add;
-use chrono::{DateTime, DurationRound, Local, TimeDelta};
 use crate::manager_mygrid::errors::MyGridError;
 use crate::manager_mygrid::models::{BaseData, Block};
 use crate::models::{DataItem, MygridData};
@@ -69,38 +67,11 @@ fn transform_base_data(base_data: BaseData) -> Result<MygridData, MyGridError> {
     Ok(mygrid)
 }
 
-
+/// Converts and rounds from watts to kilowatts
+/// 
+/// # Arguments
+/// 
+/// * 'w' - input in watts
 fn to_kw(w: f64) -> f64 {
     (w / 10.0).round() / 100.0
-}
-
-fn get_range(vec_in: &Vec<DateTime<Local>>, from: DateTime<Local>, to: DateTime<Local>) -> (usize, usize) {
-    let start = vec_in
-        .iter()
-        .position(|d| d >= &from);
-
-    let end = vec_in
-        .iter()
-        .rposition(|d| d < &to)
-        .map(|d| d+1)
-        .unwrap_or(vec_in.len());
-
-    if let Some(start) = start {
-        (start, end)
-    } else {
-        (0, 0)
-    }
-}
-
-fn get_date_start_end(vec_in: &Vec<DateTime<Local>>) -> Result<Option<(DateTime<Local>, DateTime<Local>)>, MyGridError> {
-    if vec_in.len() != 0 {
-        let end = vec_in[0].duration_trunc(TimeDelta::hours(1))?;
-        let start = end.duration_trunc(TimeDelta::days(1))?;
-        
-        if end != start {
-            return Ok(Some((start, end.add(TimeDelta::hours(-1)))));
-        }
-    }
-    
-    Ok(None)
 }
