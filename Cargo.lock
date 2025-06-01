@@ -1450,6 +1450,7 @@ dependencies = [
  "actix-files",
  "actix-web",
  "chrono",
+ "glob",
  "log",
  "log4rs",
  "md-5",

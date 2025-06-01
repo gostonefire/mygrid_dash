@@ -100,6 +100,18 @@ async fn est_load(data: web::Data<AppState>) -> impl Responder {
     }
 }
 
+#[get("/combined_realtime")]
+async fn combined_realtime(data: web::Data<AppState>) -> impl Responder {
+    let mut comms = data.comms.lock().await;
+    comms.tx_to_mygrid.send(Cmd::CombinedRealTime).unwrap();
+
+    if let Some(json) = comms.rx_from_mygrid.recv().await {
+        HttpResponse::Ok().body(json)
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+}
+
 #[get("/combined_production")]
 async fn combined_production(data: web::Data<AppState>) -> impl Responder {
     let mut comms = data.comms.lock().await;

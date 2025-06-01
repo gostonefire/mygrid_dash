@@ -9,9 +9,16 @@
     <link href="./dark.css" rel="stylesheet" />
 
     <style>
-        #production, #load {
+        .flex-container {
+            display: flex;
+            justify-content: center;
+            flex-flow: row wrap;
+        }
+
+        #realtime, #production, #load {
             max-width: 800px;
-            margin: 35px auto;
+            flex-basis: 100%;
+            margin: 10px;
         }
     </style>
 
@@ -20,7 +27,9 @@
 </head>
 
 <body>
-<div id="production"></div><div id="load"></div>
+<div class="flex-container">
+    <div id="realtime"></div><div id="production"></div><div id="load"></div>
+</div>
 
 <script src="./mygrid_dash.js"></script>
 

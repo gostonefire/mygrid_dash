@@ -8,9 +8,8 @@ use crate::errors::DispatcherError;
 use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
-use crate::manager_mygrid::errors::MyGridError;
 use crate::manager_mygrid::models::Block;
-use crate::models::{DataItem, DataPoint, HistoryData, MyGrid, MygridData, RealTimeData, Series};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series};
 
 pub enum Cmd {
     Soc,
@@ -21,6 +20,7 @@ pub enum Cmd {
     LoadHistory,
     EstProduction,
     EstLoad,
+    CombinedRealTime,
     CombinedProduction,
     CombinedLoad,
     Schedule,
@@ -123,7 +123,6 @@ impl Dispatcher {
         Ok(Self {
             schedule: None,
             base_data: MygridData {
-                date_time: DateTime::default(),
                 forecast_temp: Vec::new(),
                 forecast_cloud: Vec::new(),
                 production: Vec::new(),
@@ -167,6 +166,7 @@ impl Dispatcher {
             Cmd::LoadHistory         => self.get_load_history()?,
             Cmd::EstProduction       => self.get_est_production()?,
             Cmd::EstLoad             => self.get_est_load()?,
+            Cmd::CombinedRealTime    => self.get_combined_real_time()?,
             Cmd::CombinedProduction  => self.get_combined_production()?,
             Cmd::CombinedLoad        => self.get_combined_load()?,
             Cmd::Schedule            => self.get_schedule()?,
@@ -182,7 +182,7 @@ impl Dispatcher {
     /// Returns current SoC
     ///
     fn get_current_soc(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint { data: self.real_time_data.soc })?)
+        Ok(serde_json::to_string_pretty(&DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc })?)
     }
 
     /// Returns soc history since midnight
@@ -194,7 +194,7 @@ impl Dispatcher {
     /// Returns the weighted moving average production over the stored real time data points
     ///
     fn get_current_production(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint{ data: self.real_time_data.production})?)
+        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Production".to_string(), y: self.real_time_data.production })?)
     }
 
     /// Returns production history since midnight
@@ -206,7 +206,7 @@ impl Dispatcher {
     /// Returns the weighted moving average load over the stored real time data points
     /// 
     fn get_current_load(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint{ data: self.real_time_data.load})?)
+        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Load".to_string(), y: self.real_time_data.load })?)
     }
     
     /// Returns load history since midnight
@@ -226,16 +226,41 @@ impl Dispatcher {
     fn get_est_load(&self) -> Result<String, DispatcherError> {
         Ok(serde_json::to_string_pretty(&self.base_data.consumption)?)
     }
+
+    /// Returns a combined series of real time data of load, production and SoC
+    ///
+    fn get_combined_real_time(&self) -> Result<String, DispatcherError> {
+        let series: (Series<DataPoint<f64>>, Series<DataPoint<f64>>, Series<DataPoint<u8>>) = (
+            Series {
+                name: "Production".to_string(),
+                chart_type: "column".to_string(),
+                data: &vec![DataPoint { x: "Production".to_string(), y: self.real_time_data.production }],
+            },            
+            Series {
+                name: "Load".to_string(),
+                chart_type: "column".to_string(),
+                data: &vec![DataPoint { x: "Load".to_string(), y: self.real_time_data.load }],
+            },
+            Series {
+                name: "SoC".to_string(),
+                chart_type: "column".to_string(),
+                data: &vec![DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc }],
+            },
+        );
+
+        Ok(serde_json::to_string_pretty(&series)?)
+    }
     
     /// Returns a combined series of estimated production and production history
     /// 
     fn get_combined_production(&self) -> Result<String, DispatcherError> {
-        let series: (Series<f64>, Series<f64>) = (
+        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
             Series {
                 name: "Estimated Production".to_string(),
                 chart_type: "area".to_string(),
                 data: &self.base_data.production,
-            },            Series {
+            },            
+            Series {
                 name: "Production".to_string(),
                 chart_type: "line".to_string(),
                 data: &self.history_data.production_history,
@@ -248,12 +273,13 @@ impl Dispatcher {
     /// Returns a combined series of estimated load and load history
     ///
     fn get_combined_load(&self) -> Result<String, DispatcherError> {
-        let series: (Series<f64>, Series<f64>) = (
+        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
             Series {
                 name: "Estimated Load".to_string(),
                 chart_type: "area".to_string(),
                 data: &self.base_data.consumption,
-            },            Series {
+            },            
+            Series {
                 name: "Load".to_string(),
                 chart_type: "line".to_string(),
                 data: &self.history_data.load_history,
@@ -347,61 +373,12 @@ impl Dispatcher {
     /// 
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
         self.schedule =  Some(get_schedule(&self.schedule_path).await?);
-        let base_data = get_base_data(&self.base_data_path).await?;
+        
         let local_now = Local::now();
         let from = local_now.duration_trunc(TimeDelta::days(1))?;
         let to = from.add(TimeDelta::days(1));
-        
-        let mut forecast_temp = filter_time(&base_data.forecast_temp, from, to);
-        let mut forecast_cloud = filter_time(&base_data.forecast_cloud, from, to);
-        let mut production = filter_time(&base_data.production, from, to);
-        let mut consumption = filter_time(&base_data.consumption, from, to);
-        let mut tariffs_buy = filter_time(&base_data.tariffs_buy, from, to);
-        let mut tariffs_sell = filter_time(&base_data.tariffs_sell, from, to);
 
-        let load_start = base_data.date_time.duration_trunc(TimeDelta::hours(1))?;
-        
-        if self.base_data.date_time.ordinal0() == base_data.date_time.ordinal0() {
-            forecast_temp = append_tail(
-                filter_time(&self.base_data.forecast_temp, from, load_start), 
-                forecast_temp
-            );
-
-            forecast_cloud = append_tail(
-                filter_time(&self.base_data.forecast_cloud, from, load_start),
-                forecast_cloud
-            );
-
-            production = append_tail(
-                filter_time(&self.base_data.production, from, load_start),
-                production
-            );
-
-            consumption = append_tail(
-                filter_time(&self.base_data.consumption, from, load_start),
-                consumption
-            );
-
-            tariffs_buy = append_tail(
-                filter_time(&self.base_data.tariffs_buy, from, load_start),
-                tariffs_buy
-            );
-
-            tariffs_sell = append_tail(
-                filter_time(&self.base_data.tariffs_sell, from, load_start),
-                tariffs_sell
-            );
-        };
-        
-        self.base_data = MygridData {
-            date_time: base_data.date_time,
-            forecast_temp: pad(forecast_temp, DataItem { x: local_now, y: 0.0 })?,
-            forecast_cloud: pad(forecast_cloud, DataItem { x: local_now, y: 0.0 })?,
-            production: pad(production, DataItem { x: local_now, y: 0.0 })?,
-            consumption: pad(consumption, DataItem { x: local_now, y: 0.0 })?,
-            tariffs_buy: pad(tariffs_buy, DataItem { x: local_now, y: 0.0 })?,
-            tariffs_sell: pad(tariffs_sell, DataItem { x: local_now, y: 0.0 })?,
-        };
+        self.base_data = get_base_data(&self.base_data_path, from, to).await?;
             
         Ok(())
     }
@@ -428,13 +405,13 @@ impl Dispatcher {
             self.real_time_data.prod_data.pop_front();
         }
         self.real_time_data.prod_data.push_back(real_time_data.pv_power);
-        self.real_time_data.production = get_wma(&self.real_time_data.prod_data);
+        self.real_time_data.production = two_decimals(get_wma(&self.real_time_data.prod_data));
         
         if self.real_time_data.load_data.len() == 3 {
             self.real_time_data.load_data.pop_front();
         }
         self.real_time_data.load_data.push_back(real_time_data.ld_power);
-        self.real_time_data.load = get_wma(&self.real_time_data.load_data);
+        self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
         
         self.real_time_data.timestamp = timestamp;
         
@@ -482,52 +459,11 @@ fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
     }
 }
 
-/// Returns a vector with items from the given vector where the date is greater or equal to start
-/// end less than end
-///
-/// # Arguments
-///
-/// * 'vec_in' - the input vector to filter
-/// * 'start' - the start date to compare with
-/// * 'end' - the end date to compare with 
-fn filter_time<T: MyGrid + Clone>(vec_in: &Vec<T>, start: DateTime<Local>, end: DateTime<Local>) -> Vec<T> {
-    vec_in
-        .iter()
-        .filter(|f| f.is_within(start, end))
-        .map(|f| f.clone())
-        .collect::<Vec<T>>()
-}
-
-/// Pads (left) with missing hours from midnight
-/// The value field is set according the given model
+/// Round to two decimals
 /// 
 /// # Arguments
 /// 
-/// * 'vec_in' - the vector to pad
-/// * 'model' - the model struct which has the date field set to today's date and value fields according to what the padded dates should be set to
-fn pad<T: MyGrid<Item = T>>(mut vec_in: Vec<T>, model: T) -> Result<Vec<T>, MyGridError> {
-    let start = model.date_time_day()?;
-    let mut end = if let Some(t) = vec_in.get(0) {
-        t.date_time_hour()?
-    } else {
-        start.add(TimeDelta::days(1))
-    };
-
-    while start < end {
-        end += TimeDelta::hours(-1);
-        vec_in.insert(0, model.create_new(end));
-    }
-
-    Ok(vec_in)
-}
-
-/// Appends a vector
-/// 
-/// # Arguments
-/// 
-/// * 'this' - the vector to append to
-/// * 'other' - the vector to append 
-fn append_tail<T: MyGrid<Item = T>>(mut this: Vec<T>, mut other: Vec<T>) -> Vec<T> {
-    this.append(&mut other);
-    this
+/// * 'a' - value to round
+fn two_decimals(a: f64) -> f64 {
+    (a * 100.0).round() / 100.0
 }

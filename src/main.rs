@@ -57,6 +57,7 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(load_history)
                 .service(est_production)
                 .service(est_load)
+                .service(combined_realtime)
                 .service(combined_production)
                 .service(combined_load)
                 .service(schedule)

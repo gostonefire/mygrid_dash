@@ -5,7 +5,8 @@ use crate::serialize_timestamp;
 
 #[derive(Serialize)]
 pub struct DataPoint<T> {
-    pub data: T,
+    pub x: String,
+    pub y: T,
 }
 
 #[derive(Serialize, Clone)]
@@ -20,7 +21,7 @@ pub struct Series<'a, T> {
     pub name: String,
     #[serde(rename(serialize = "type"))]
     pub chart_type: String,
-    pub data: &'a Vec<DataItem<T>>,
+    pub data: &'a Vec<T>,
 }
 
 pub struct HistoryData {
@@ -39,7 +40,6 @@ pub struct RealTimeData {
     pub timestamp: i64,
 }
 pub struct MygridData {
-    pub date_time: DateTime<Local>,
     pub forecast_temp: Vec<DataItem<f64>>,
     pub forecast_cloud: Vec<DataItem<f64>>,
     pub production: Vec<DataItem<f64>>,
@@ -63,10 +63,6 @@ pub trait MyGrid {
     ///
     fn date_time_hour(&self) -> Result<DateTime<Local>, RoundingError>;
 
-    /// Returns the `Item` represented date time truncated to days
-    /// 
-    fn date_time_day(&self) -> Result<DateTime<Local>, RoundingError>;
-
     /// Returns a new instance of type `Item` with the given date_time set
     /// 
     fn create_new(&self, date_time: DateTime<Local>) -> Self::Item;
@@ -74,17 +70,13 @@ pub trait MyGrid {
 
 impl MyGrid for DataItem<f64> {
     type Item = DataItem<f64>;
-    
+
     fn is_within(&self, start: DateTime<Local>, end: DateTime<Local>) -> bool {
         self.x >= start && self.x < end
     }
 
     fn date_time_hour(&self) -> Result<DateTime<Local>, RoundingError> {
         self.x.duration_trunc(TimeDelta::hours(1))
-    }
-
-    fn date_time_day(&self) -> Result<DateTime<Local>, RoundingError> {
-        self.x.duration_trunc(TimeDelta::days(1))
     }
 
     fn create_new(&self, date_time: DateTime<Local>) -> Self::Item {

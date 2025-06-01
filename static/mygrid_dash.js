@@ -59,6 +59,126 @@ Apex.chart = {
     defaultLocale: "se"
 }
 
+// combined realtime values for production, load and SoC (State of Charge)
+//
+var realtime_options = {
+    series: [],
+    chart: {
+        height: 350,
+        type: 'bar',
+    },
+    colors: ["#00E396", "#FF4560", "#FEB019"],
+    stroke: {
+        show: true,
+        width: 3,
+        //colors: ['transparent']
+    },
+    fill: {
+        type:'solid',
+        opacity: [0.7, 0.7, 0.7],
+    },
+    plotOptions: {
+        bar: {
+            columnWidth: '70%',
+            dataLabels: {
+                position: 'top',
+            }
+        }
+    },
+    dataLabels: {
+        enabled: true,
+        formatter: function(value, { seriesIndex }) {
+            if (seriesIndex <= 1) {
+                return value + " kW";
+            } else {
+                return value + "%";
+            }
+        },
+        offsetY: -20,
+        style: {
+            fontSize: '12px',
+        }
+    },
+    yaxis: [
+        {
+            seriesName: 'Production',
+            axisBorder: {
+                show: false
+            },
+            axisTicks: {
+                show: false,
+            },
+            labels: {
+                show: true,
+                formatter: function (val) {
+                    return val + " kW";
+                }
+            }
+        },
+        {
+            seriesName: 'Production',
+            show: false,
+        },
+        {
+            seriesName: 'SoC',
+            opposite: true,
+            min: 0,
+            max: 100,
+            axisBorder: {
+                show: false
+            },
+            axisTicks: {
+                show: false,
+            },
+            labels: {
+                show: true,
+                formatter: function (val) {
+                    return Math.round(val) + "%";
+                }
+            }
+        }
+    ],
+    xaxis: {
+        position: 'bottom',
+        type: 'category',
+        axisBorder: {
+            show: false
+        },
+        axisTicks: {
+            show: false
+        },
+        labels: {
+            show: false,
+        },
+    },
+    tooltip: {
+        enabled: false,
+    },
+    title: {
+        text: 'Realtime',
+        floating: true,
+        offsetY: 0,
+        align: 'center',
+    },
+    noData: {
+        text: 'Loading...'
+    },
+    theme: {
+        mode: 'dark',
+        palette: 'palette1',
+        monochrome: {
+            enabled: false,
+            color: '#255aee',
+            shadeTo: 'light',
+            shadeIntensity: 0.65
+        },
+    }
+};
+
+
+var realtime = new ApexCharts(document.querySelector("#realtime"), realtime_options);
+realtime.render();
+
 // combined production and estimated production
 //
 var prod_options = {
@@ -67,6 +187,7 @@ var prod_options = {
         height: 350,
         type: 'line',
     },
+    colors: ["#008FFB", "#00E396"],
     stroke: {
         curve: 'smooth',
         width: [2,2],
@@ -135,10 +256,6 @@ var prod_options = {
 var production = new ApexCharts(document.querySelector("#production"), prod_options);
 production.render();
 
-$.getJSON('https://hobbylap.gridfire.org:8080/combined_production', function(response) {
-    production.updateSeries(response)
-});
-
 // combined estimated and history load
 //
 var load_options = {
@@ -147,6 +264,7 @@ var load_options = {
         height: 350,
         type: 'line',
     },
+    colors: ["#008FFB", "#FF4560"],
     stroke: {
         curve: 'smooth',
         width: [2,2],
@@ -214,6 +332,21 @@ var load_options = {
 var load = new ApexCharts(document.querySelector("#load"), load_options);
 load.render();
 
-$.getJSON('https://hobbylap.gridfire.org:8080/combined_load', function(response) {
-    load.updateSeries(response)
-});
+function refreshData() {
+    $.getJSON('https://hobbylap.gridfire.org:8080/combined_realtime', function(response) {
+        realtime.updateSeries(response)
+    });
+
+    $.getJSON('https://hobbylap.gridfire.org:8080/combined_production', function(response) {
+        production.updateSeries(response)
+    });
+
+    $.getJSON('https://hobbylap.gridfire.org:8080/combined_load', function(response) {
+        load.updateSeries(response)
+    });
+}
+
+refreshData();
+setInterval(() => {
+    refreshData();
+}, 60000);

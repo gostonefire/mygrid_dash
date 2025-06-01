@@ -16,3 +16,6 @@ impl From<serde_json::Error> for MyGridError {
 impl From<chrono::round::RoundingError> for MyGridError {
     fn from(e: chrono::round::RoundingError) -> Self { MyGridError(e.to_string()) }
 }
+impl From<glob::PatternError> for MyGridError {
+    fn from(e: glob::PatternError) -> Self { MyGridError(e.to_string()) }
+}

@@ -35,7 +35,6 @@ pub struct TariffValues {
 
 #[derive(Deserialize)]
 pub struct BaseData {
-    pub date_time: DateTime<Local>,
     pub forecast: Vec<ForecastValues>,
     pub production: Vec<ProductionValues>,
     pub consumption: Vec<ConsumptionValues>,

@@ -92,8 +92,8 @@ impl Fox {
         
         for data in fox_data.result[0].datas.iter() {
             match data.variable.as_str() {
-                "pvPower" => device_real_time.pv_power = data.value * 1000.0,
-                "loadsPower" => device_real_time.ld_power = data.value * 1000.0,
+                "pvPower" => device_real_time.pv_power = data.value,
+                "loadsPower" => device_real_time.ld_power = data.value,
                 "SoC" => device_real_time.soc = data.value.round() as u8,
                 _ => (),
             }
