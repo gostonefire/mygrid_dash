@@ -70,6 +70,7 @@ async fn main() -> Result<(), UnrecoverableError> {
             .workers(4)
             .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
             //.bind(("127.0.0.1", 8080))?
+            .disable_signals()
             .run());
 
     // Main dispatch function

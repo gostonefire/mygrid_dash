@@ -230,20 +230,18 @@ impl Dispatcher {
     /// Returns a combined series of real time data of load, production and SoC
     ///
     fn get_combined_real_time(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataPoint<f64>>, Series<DataPoint<f64>>, Series<DataPoint<u8>>) = (
+        let series: (Series<DataPoint<f64>>, Series<DataPoint<u8>>) = (
             Series {
-                name: "Production".to_string(),
-                chart_type: "column".to_string(),
-                data: &vec![DataPoint { x: "Production".to_string(), y: self.real_time_data.production }],
+                name: "Combined".to_string(),
+                chart_type: String::new(),
+                data: &vec![
+                    DataPoint { x: "Production".to_string(), y: self.real_time_data.production },
+                    DataPoint { x: "Load".to_string(), y: self.real_time_data.load }
+                ],
             },            
             Series {
-                name: "Load".to_string(),
-                chart_type: "column".to_string(),
-                data: &vec![DataPoint { x: "Load".to_string(), y: self.real_time_data.load }],
-            },
-            Series {
                 name: "SoC".to_string(),
-                chart_type: "column".to_string(),
+                chart_type: String::new(),
                 data: &vec![DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc }],
             },
         );
@@ -310,7 +308,14 @@ impl Dispatcher {
     /// Returns the buy tariffs for the day
     ///
     fn get_tariffs_buy(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.tariffs_buy)?)
+        let series: Series<DataItem<f64>> = 
+            Series {
+                name: "Tariffs Buy".to_string(),
+                chart_type: String::new(),
+                data: &self.base_data.tariffs_buy,
+            };
+
+        Ok(serde_json::to_string_pretty(&series)?)
     }
 
     /// Returns the sell tariffs for the day

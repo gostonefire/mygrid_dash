@@ -61,25 +61,31 @@ Apex.chart = {
 
 // combined realtime values for production, load and SoC (State of Charge)
 //
-var realtime_options = {
+let realtime_options = {
     series: [],
     chart: {
         height: 350,
         type: 'bar',
+        toolbar: {
+            show: false,
+        },
+        zoom: {
+            enabled: false,
+        },
     },
-    colors: ["#00E396", "#FF4560", "#FEB019"],
+    colors: ["#00E396", "#FF4560"],
     stroke: {
         show: true,
-        width: 3,
-        //colors: ['transparent']
+        width: 2,
     },
     fill: {
-        type:'solid',
-        opacity: [0.7, 0.7, 0.7],
+        type: 'solid',
+        opacity: 0.7,
     },
     plotOptions: {
         bar: {
-            columnWidth: '70%',
+            columnWidth: '50%',
+            distributed: true,
             dataLabels: {
                 position: 'top',
             }
@@ -87,57 +93,25 @@ var realtime_options = {
     },
     dataLabels: {
         enabled: true,
-        formatter: function(value, { seriesIndex }) {
-            if (seriesIndex <= 1) {
-                return value + " kW";
-            } else {
-                return value + "%";
-            }
+        formatter: function(value) {
+            return value + " kW";
         },
-        offsetY: -20,
-        style: {
-            fontSize: '12px',
-        }
+
     },
-    yaxis: [
-        {
-            seriesName: 'Production',
-            axisBorder: {
-                show: false
-            },
-            axisTicks: {
-                show: false,
-            },
-            labels: {
-                show: true,
-                formatter: function (val) {
-                    return val + " kW";
-                }
-            }
+    yaxis: {
+        axisBorder: {
+            show: false
         },
-        {
-            seriesName: 'Production',
+        axisTicks: {
             show: false,
         },
-        {
-            seriesName: 'SoC',
-            opposite: true,
-            min: 0,
-            max: 100,
-            axisBorder: {
-                show: false
-            },
-            axisTicks: {
-                show: false,
-            },
-            labels: {
-                show: true,
-                formatter: function (val) {
-                    return Math.round(val) + "%";
-                }
+        labels: {
+            show: true,
+            formatter: function (val) {
+                return val + " kW";
             }
         }
-    ],
+    },
     xaxis: {
         position: 'bottom',
         type: 'category',
@@ -155,7 +129,7 @@ var realtime_options = {
         enabled: false,
     },
     title: {
-        text: 'Realtime',
+        text: 'Current Production & Load',
         floating: true,
         offsetY: 0,
         align: 'center',
@@ -176,16 +150,206 @@ var realtime_options = {
 };
 
 
-var realtime = new ApexCharts(document.querySelector("#realtime"), realtime_options);
+let realtime = new ApexCharts(document.querySelector("#realtime"), realtime_options);
 realtime.render();
+
+// Realtime SoC (State of Charge)
+//
+let soc_options = {
+    series: [],
+    chart: {
+        height: 350,
+        type: 'bar',
+        toolbar: {
+            show: false,
+        },
+        zoom: {
+            enabled: false,
+        },
+    },
+    colors: ["#FEB019"],
+    stroke: {
+        show: true,
+        width: 2,
+    },
+    fill: {
+        type:'solid',
+        opacity: 0.7,
+    },
+    plotOptions: {
+        bar: {
+            columnWidth: '40%',
+            dataLabels: {
+                position: 'top',
+            }
+        }
+    },
+    dataLabels: {
+        enabled: true,
+        formatter: function(value) {
+            return value + "%";
+        },
+    },
+    yaxis: {
+        min: 0,
+        max: 100,
+        axisBorder: {
+            show: false
+        },
+        axisTicks: {
+            show: false,
+        },
+        labels: {
+            show: true,
+            formatter: function (val) {
+                return val + "%";
+            }
+        }
+    },
+    xaxis: {
+        position: 'bottom',
+        type: 'category',
+        axisBorder: {
+            show: false
+        },
+        axisTicks: {
+            show: false
+        },
+        labels: {
+            show: true,
+        },
+    },
+    tooltip: {
+        enabled: false,
+    },
+    title: {
+        text: 'Current SoC',
+        floating: true,
+        offsetY: 0,
+        align: 'center',
+    },
+    noData: {
+        text: 'Loading...'
+    },
+    theme: {
+        mode: 'dark',
+        palette: 'palette1',
+        monochrome: {
+            enabled: false,
+            color: '#255aee',
+            shadeTo: 'light',
+            shadeIntensity: 0.65
+        },
+    }
+};
+
+
+let soc = new ApexCharts(document.querySelector("#soc"), soc_options);
+soc.render();
+
+// tariffs buy
+//
+let tariffs_buy_options= {
+    series: [],
+    chart: {
+        height: 350,
+        type: 'bar',
+        toolbar: {
+            show: false,
+        },
+        zoom: {
+            enabled: false,
+        },
+    },
+    colors: [
+        function({ value }) {
+            if (value <= 2) {
+                return "#00E396"
+            } else if (value > 2 && value <= 4) {
+                return "#FEB019"
+            } else {
+                return "#FF4560"
+            }
+        }
+    ],
+    fill: {
+        type:'solid',
+        opacity: 0.8,
+    },
+    dataLabels: {
+        enabled: false,
+    },
+    yaxis: {
+        min: 0,
+        max: 10,
+        axisBorder: {
+            show: false
+        },
+        axisTicks: {
+            show: false,
+        },
+        labels: {
+            show: true,
+            formatter: function (val) {
+                return val + " kr";
+            }
+        }
+    },
+    xaxis: {
+        position: 'bottom',
+        type: 'datetime',
+        axisBorder: {
+            show: false
+        },
+        axisTicks: {
+            show: true
+        },
+        labels: {
+            show: true,
+        },
+    },
+    tooltip: {
+        enabled: false,
+    },
+    title: {
+        text: 'Tariffs Buy',
+        floating: true,
+        offsetY: 0,
+        align: 'center',
+    },
+    noData: {
+        text: 'Loading...'
+    },
+    theme: {
+        mode: 'dark',
+        palette: 'palette1',
+        monochrome: {
+            enabled: false,
+            color: '#255aee',
+            shadeTo: 'light',
+            shadeIntensity: 0.65
+        },
+    }
+};
+
+
+let tariffs_buy = new ApexCharts(document.querySelector("#tariffs-buy"), tariffs_buy_options);
+tariffs_buy.render();
+
 
 // combined production and estimated production
 //
-var prod_options = {
+let prod_options = {
     series: [],
     chart: {
         height: 350,
         type: 'line',
+        toolbar: {
+            show: false,
+        },
+        zoom: {
+            enabled: false,
+        },
     },
     colors: ["#008FFB", "#00E396"],
     stroke: {
@@ -224,12 +388,7 @@ var prod_options = {
         },
     },
     tooltip: {
-        enabled: true,
-        shared: true,
-        x: {
-            show: true,
-            format: 'HH:mm',
-        },
+        enabled: false,
     },
     title: {
         text: 'Power Production',
@@ -253,16 +412,22 @@ var prod_options = {
 };
 
 
-var production = new ApexCharts(document.querySelector("#production"), prod_options);
+let production = new ApexCharts(document.querySelector("#production"), prod_options);
 production.render();
 
 // combined estimated and history load
 //
-var load_options = {
+let load_options = {
     series: [],
     chart: {
         height: 350,
         type: 'line',
+        toolbar: {
+            show: false,
+        },
+        zoom: {
+            enabled: false,
+        },
     },
     colors: ["#008FFB", "#FF4560"],
     stroke: {
@@ -301,12 +466,7 @@ var load_options = {
         },
     },
     tooltip: {
-        enabled: true,
-        shared: true,
-        x: {
-            show: true,
-            format: 'HH:mm',
-        },
+        enabled: false,
     },
     title: {
         text: 'Power Load',
@@ -329,12 +489,17 @@ var load_options = {
     }
 };
 
-var load = new ApexCharts(document.querySelector("#load"), load_options);
+let load = new ApexCharts(document.querySelector("#load"), load_options);
 load.render();
 
 function refreshData() {
     $.getJSON('https://hobbylap.gridfire.org:8080/combined_realtime', function(response) {
-        realtime.updateSeries(response)
+        realtime.updateSeries([response[0]])
+        soc.updateSeries([response[1]])
+    });
+
+    $.getJSON('https://hobbylap.gridfire.org:8080/tariffs_buy', function(response) {
+        tariffs_buy.updateSeries([response])
     });
 
     $.getJSON('https://hobbylap.gridfire.org:8080/combined_production', function(response) {
