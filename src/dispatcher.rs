@@ -12,14 +12,6 @@ use crate::manager_mygrid::models::Block;
 use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series};
 
 pub enum Cmd {
-    Soc,
-    SocHistory,
-    Production,
-    ProductionHistory,
-    Load,
-    LoadHistory,
-    EstProduction,
-    EstLoad,
     CombinedRealTime,
     CombinedProduction,
     CombinedLoad,
@@ -27,7 +19,6 @@ pub enum Cmd {
     ForecastTemp,
     ForecastCloud,
     TariffsBuy,
-    TariffsSell,
 }
 
 
@@ -158,14 +149,6 @@ impl Dispatcher {
     /// * 'cmd' - the command to evaluate and execute
     async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String, DispatcherError> {
         let data = match cmd {
-            Cmd::Soc                 => self.get_current_soc()?,
-            Cmd::SocHistory          => self.get_soc_history()?,
-            Cmd::Production          => self.get_current_production()?,
-            Cmd::ProductionHistory   => self.get_production_history()?,
-            Cmd::Load                => self.get_current_load()?,
-            Cmd::LoadHistory         => self.get_load_history()?,
-            Cmd::EstProduction       => self.get_est_production()?,
-            Cmd::EstLoad             => self.get_est_load()?,
             Cmd::CombinedRealTime    => self.get_combined_real_time()?,
             Cmd::CombinedProduction  => self.get_combined_production()?,
             Cmd::CombinedLoad        => self.get_combined_load()?,
@@ -173,58 +156,9 @@ impl Dispatcher {
             Cmd::ForecastTemp        => self.get_forecast_temp()?,
             Cmd::ForecastCloud       => self.get_forecast_cloud()?,
             Cmd::TariffsBuy          => self.get_tariffs_buy()?,
-            Cmd::TariffsSell         => self.get_tariffs_sell()?,
         };
 
         Ok(data)
-    }
-
-    /// Returns current SoC
-    ///
-    fn get_current_soc(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc })?)
-    }
-
-    /// Returns soc history since midnight
-    /// 
-    fn get_soc_history(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.history_data.soc_history)?)
-    }
-
-    /// Returns the weighted moving average production over the stored real time data points
-    ///
-    fn get_current_production(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Production".to_string(), y: self.real_time_data.prod })?)
-    }
-
-    /// Returns production history since midnight
-    ///
-    fn get_production_history(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.history_data.prod_history)?)
-    }
-
-    /// Returns the weighted moving average load over the stored real time data points
-    /// 
-    fn get_current_load(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Load".to_string(), y: self.real_time_data.load })?)
-    }
-    
-    /// Returns load history since midnight
-    ///
-    fn get_load_history(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.history_data.prod_history)?)
-    }
-
-    /// Returns estimated production for the day
-    /// 
-    fn get_est_production(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.mygrid_data.prod)?)
-    }
-
-    /// Returns estimated load for the day
-    ///
-    fn get_est_load(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.mygrid_data.load)?)
     }
 
     /// Returns a combined series of real time data of load, production and SoC
@@ -330,12 +264,6 @@ impl Dispatcher {
             };
 
         Ok(serde_json::to_string_pretty(&series)?)
-    }
-
-    /// Returns the sell tariffs for the day
-    ///
-    fn get_tariffs_sell(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.mygrid_data.tariffs_sell)?)
     }
 
     /// Updates all history fields with fresh data, either delta since last update or
