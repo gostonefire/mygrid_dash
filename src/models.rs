@@ -26,14 +26,14 @@ pub struct Series<'a, T> {
 
 pub struct HistoryData {
     pub soc_history: Vec<DataItem<u8>>,
-    pub production_history: Vec<DataItem<f64>>,
+    pub prod_history: Vec<DataItem<f64>>,
     pub load_history: Vec<DataItem<f64>>,
     pub last_end_time: DateTime<Utc>
 }
 
 pub struct RealTimeData {
     pub soc: u8,
-    pub production: f64,
+    pub prod: f64,
     pub load: f64,
     pub prod_data: VecDeque<f64>,
     pub load_data: VecDeque<f64>,
@@ -42,8 +42,8 @@ pub struct RealTimeData {
 pub struct MygridData {
     pub forecast_temp: Vec<DataItem<f64>>,
     pub forecast_cloud: Vec<DataItem<f64>>,
-    pub production: Vec<DataItem<f64>>,
-    pub consumption: Vec<DataItem<f64>>,
+    pub prod: Vec<DataItem<f64>>,
+    pub load: Vec<DataItem<f64>>,
     pub tariffs_buy: Vec<DataItem<f64>>,
     pub tariffs_sell: Vec<DataItem<f64>>,
 }

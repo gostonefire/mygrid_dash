@@ -11,17 +11,22 @@
     <style>
         .flex-outer {
             display: flex;
-            justify-content: center;
+            justify-content: left;
             flex-flow: row wrap;
         }
 
-        .flex-inner {
+        .flex-row {
             display: flex;
             justify-content: space-between;
             flex-flow: row;
         }
 
-        #realtime-box, #tariffs-buy, #production, #load {
+        .flex-column {
+            display: flex;
+            flex-flow: column;
+        }
+
+        #realtime-box, #tariffs-buy, #mygrid, #forecast {
             max-width: 800px;
             flex-basis: 100%;
             margin: 10px;
@@ -36,21 +41,31 @@
             flex-basis: 100%;
             padding: 0 0 0 5px;
         }
+        #cloud-factor, #temperature, #production, #load {
+            max-width: 800px;
+            flex-basis: 100%;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="./jquery-3.7.1.min.js"></script>
 </head>
 
 <body>
 <div class="flex-outer">
-    <div class="flex-inner" id="realtime-box">
+    <div class="flex-row" id="realtime-box">
         <div id="realtime"></div>
         <div id="soc"></div>
     </div>
     <div id="tariffs-buy"></div>
-    <div id="production"></div>
-    <div id="load"></div>
+    <div class="flex-column" id="mygrid">
+        <div id="production"></div>
+        <div id="load"></div>
+    </div>
+    <div class="flex-column" id="forecast">
+        <div id="cloud-factor"></div>
+        <div id="temperature"></div>
+    </div>
 </div>
 
 

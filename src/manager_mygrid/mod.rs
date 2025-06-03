@@ -54,7 +54,7 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
         for d in base_data.forecast {
             let datetime = d.date_time.with_timezone(&Utc);
             forecast_temp.insert(datetime, DataItem { x: d.date_time, y: d.temp });
-            forecast_cloud.insert(datetime, DataItem { x: d.date_time, y: d.cloud_factor });
+            forecast_cloud.insert(datetime, DataItem { x: d.date_time, y: 1.0 - d.cloud_factor });
         }
 
         for d in base_data.production {
@@ -77,8 +77,8 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
     let mut mygrid = MygridData {
         forecast_temp: Vec::new(),
         forecast_cloud: Vec::new(),
-        production: Vec::new(),
-        consumption: Vec::new(),
+        prod: Vec::new(),
+        load: Vec::new(),
         tariffs_buy: Vec::new(),
         tariffs_sell: Vec::new(),
     };
@@ -86,8 +86,8 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
     let model = DataItem { x: Default::default(), y: 0.0 };
     move_filter_pad(forecast_temp, &mut mygrid.forecast_temp, &model, from, to)?;
     move_filter_pad(forecast_cloud, &mut mygrid.forecast_cloud, &model, from, to)?;
-    move_filter_pad(production, &mut mygrid.production, &model, from, to)?;
-    move_filter_pad(consumption, &mut mygrid.consumption, &model, from, to)?;
+    move_filter_pad(production, &mut mygrid.prod, &model, from, to)?;
+    move_filter_pad(consumption, &mut mygrid.load, &model, from, to)?;
     move_filter_pad(tariffs_buy, &mut mygrid.tariffs_buy, &model, from, to)?;
     move_filter_pad(tariffs_sell, &mut mygrid.tariffs_sell, &model, from, to)?;
 

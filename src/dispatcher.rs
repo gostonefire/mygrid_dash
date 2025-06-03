@@ -102,7 +102,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
 ///
 struct Dispatcher {
     schedule: Option<Vec<Block>>,
-    base_data: MygridData,
+    mygrid_data: MygridData,
     fox_cloud: Fox,
     schedule_path: String,
     base_data_path: String,
@@ -122,11 +122,11 @@ impl Dispatcher {
 
         Ok(Self {
             schedule: None,
-            base_data: MygridData {
+            mygrid_data: MygridData {
                 forecast_temp: Vec::new(),
                 forecast_cloud: Vec::new(),
-                production: Vec::new(),
-                consumption: Vec::new(),
+                prod: Vec::new(),
+                load: Vec::new(),
                 tariffs_buy: Vec::new(),
                 tariffs_sell: Vec::new(),
             },
@@ -135,13 +135,13 @@ impl Dispatcher {
             base_data_path: config.mygrid.base_data_path.clone(),
             history_data: HistoryData {
                 soc_history: Vec::new(),
-                production_history: Vec::new(),
+                prod_history: Vec::new(),
                 load_history: Vec::new(),
                 last_end_time: Default::default(),
             },
             real_time_data: RealTimeData {
                 soc: 0,
-                production: 0.0,
+                prod: 0.0,
                 load: 0.0,
                 prod_data: VecDeque::new(),
                 load_data: VecDeque::new(),
@@ -194,13 +194,13 @@ impl Dispatcher {
     /// Returns the weighted moving average production over the stored real time data points
     ///
     fn get_current_production(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Production".to_string(), y: self.real_time_data.production })?)
+        Ok(serde_json::to_string_pretty(&DataPoint{ x: "Production".to_string(), y: self.real_time_data.prod })?)
     }
 
     /// Returns production history since midnight
     ///
     fn get_production_history(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.history_data.production_history)?)
+        Ok(serde_json::to_string_pretty(&self.history_data.prod_history)?)
     }
 
     /// Returns the weighted moving average load over the stored real time data points
@@ -212,19 +212,19 @@ impl Dispatcher {
     /// Returns load history since midnight
     ///
     fn get_load_history(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.history_data.production_history)?)
+        Ok(serde_json::to_string_pretty(&self.history_data.prod_history)?)
     }
 
     /// Returns estimated production for the day
     /// 
     fn get_est_production(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.production)?)
+        Ok(serde_json::to_string_pretty(&self.mygrid_data.prod)?)
     }
 
     /// Returns estimated load for the day
     ///
     fn get_est_load(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.consumption)?)
+        Ok(serde_json::to_string_pretty(&self.mygrid_data.load)?)
     }
 
     /// Returns a combined series of real time data of load, production and SoC
@@ -235,7 +235,7 @@ impl Dispatcher {
                 name: "Combined".to_string(),
                 chart_type: String::new(),
                 data: &vec![
-                    DataPoint { x: "Production".to_string(), y: self.real_time_data.production },
+                    DataPoint { x: "Production".to_string(), y: self.real_time_data.prod },
                     DataPoint { x: "Load".to_string(), y: self.real_time_data.load }
                 ],
             },            
@@ -256,12 +256,12 @@ impl Dispatcher {
             Series {
                 name: "Estimated Production".to_string(),
                 chart_type: "area".to_string(),
-                data: &self.base_data.production,
+                data: &self.mygrid_data.prod,
             },            
             Series {
                 name: "Production".to_string(),
                 chart_type: "line".to_string(),
-                data: &self.history_data.production_history,
+                data: &self.history_data.prod_history,
             },
         );
      
@@ -275,7 +275,7 @@ impl Dispatcher {
             Series {
                 name: "Estimated Load".to_string(),
                 chart_type: "area".to_string(),
-                data: &self.base_data.consumption,
+                data: &self.mygrid_data.load,
             },            
             Series {
                 name: "Load".to_string(),
@@ -296,13 +296,27 @@ impl Dispatcher {
     /// Returns current whether forecast temperature
     ///
     fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.forecast_temp)?)
+        let series: Series<DataItem<f64>> =
+            Series {
+                name: "Temperature".to_string(),
+                chart_type: String::new(),
+                data: &self.mygrid_data.forecast_temp,
+            };
+
+        Ok(serde_json::to_string_pretty(&series)?)
     }
 
     /// Returns current whether forecast cloud factor
     ///
     fn get_forecast_cloud(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.forecast_cloud)?)
+        let series: Series<DataItem<f64>> =
+            Series {
+                name: "Cloud Factor".to_string(),
+                chart_type: String::new(),
+                data: &self.mygrid_data.forecast_cloud,
+            };
+
+        Ok(serde_json::to_string_pretty(&series)?)
     }
 
     /// Returns the buy tariffs for the day
@@ -312,7 +326,7 @@ impl Dispatcher {
             Series {
                 name: "Tariffs Buy".to_string(),
                 chart_type: String::new(),
-                data: &self.base_data.tariffs_buy,
+                data: &self.mygrid_data.tariffs_buy,
             };
 
         Ok(serde_json::to_string_pretty(&series)?)
@@ -321,7 +335,7 @@ impl Dispatcher {
     /// Returns the sell tariffs for the day
     ///
     fn get_tariffs_sell(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.base_data.tariffs_sell)?)
+        Ok(serde_json::to_string_pretty(&self.mygrid_data.tariffs_sell)?)
     }
 
     /// Updates all history fields with fresh data, either delta since last update or
@@ -347,7 +361,7 @@ impl Dispatcher {
             last_end_time = self.history_data.last_end_time;
         } else {
             self.history_data.soc_history = Vec::new();
-            self.history_data.production_history = Vec::new();
+            self.history_data.prod_history = Vec::new();
             self.history_data.load_history = Vec::new();
         }
 
@@ -357,15 +371,14 @@ impl Dispatcher {
             
             for (i, time) in history.time.iter().enumerate() {
                 let naive_date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?;
-                //let date_time: DateTime<Local> = naive_date_time.and_utc().with_timezone(&Local);
                 let date_time = naive_date_time.and_local_timezone(Local).unwrap();
                 
                 self.history_data.soc_history.push(DataItem { x: date_time, y: history.soc[i] });
-                self.history_data.production_history.push(DataItem { x: date_time, y: history.pv_power[i] });
+                self.history_data.prod_history.push(DataItem { x: date_time, y: history.pv_power[i] });
                 self.history_data.load_history.push(DataItem { x: date_time, y: history.ld_power[i] });
             }
         }
-
+        
         self.history_data.last_end_time = last_end_time;
 
         Ok(())
@@ -383,7 +396,7 @@ impl Dispatcher {
         let from = local_now.duration_trunc(TimeDelta::days(1))?;
         let to = from.add(TimeDelta::days(1));
 
-        self.base_data = get_base_data(&self.base_data_path, from, to).await?;
+        self.mygrid_data = get_base_data(&self.base_data_path, from, to).await?;
             
         Ok(())
     }
@@ -410,7 +423,7 @@ impl Dispatcher {
             self.real_time_data.prod_data.pop_front();
         }
         self.real_time_data.prod_data.push_back(real_time_data.pv_power);
-        self.real_time_data.production = two_decimals(get_wma(&self.real_time_data.prod_data));
+        self.real_time_data.prod = two_decimals(get_wma(&self.real_time_data.prod_data));
         
         if self.real_time_data.load_data.len() == 3 {
             self.real_time_data.load_data.pop_front();
@@ -463,6 +476,35 @@ fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
         0.0
     }
 }
+
+/*
+/// Returns the moving averages from the given vector and window size
+/// In order to get the same vector length in the result, the window starts as size 1 and increases
+/// to the given window size.
+///
+/// # Arguments
+///
+/// * 'vec_in' - the raw data vector
+/// * 'window' - the window size that must be a positive integer, zero returns a vector of undefined floats
+fn get_ma(vec_in: &Vec<DataItem<f64>>, mut window: usize) -> Vec<DataItem<f64>> {
+    let mut vec_out: Vec<DataItem<f64>> = Vec::new();
+    let len = vec_in.len();
+
+    if len > 0 {
+        window = window.min(len);
+
+        for i in 1..len+1 {
+            let effective_window = window.min(i);
+            let slice = &vec_in[i-effective_window..i];
+            let y = slice.iter().map(|d| d.y).sum::<f64>() / effective_window as f64;
+            let x = slice.last().map_or(Default::default(), |d| d.x);
+            vec_out.push(DataItem { x, y });
+        }
+    }
+
+    vec_out
+}
+*/
 
 /// Round to two decimals
 /// 
