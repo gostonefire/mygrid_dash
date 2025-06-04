@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use actix_files::Files;
-use actix_web::{web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 use log::info;
 use rustls::ServerConfig;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
@@ -56,9 +56,12 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(forecast_temp)
                 .service(forecast_cloud)
                 .service(tariffs_buy)
-                .service(Files::new("/", "./static").index_file("index.html"))
+                .service(
+                    web::scope("")
+                        .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
+                        .service(Files::new("/", "./static").index_file("index.html")),
+                )
         })
-            .workers(4)
             .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
             //.bind(("127.0.0.1", 8080))?
             .disable_signals()
