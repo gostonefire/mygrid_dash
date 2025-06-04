@@ -665,28 +665,28 @@ temp.render();
 
 
 function refreshData() {
-    $.getJSON('https://hobbylap.gridfire.org:8080/combined_realtime', function(response) {
+    $.getJSON('/combined_realtime', function(response) {
         realtime.updateSeries([response[0]])
         soc.updateSeries([response[1]])
     });
 
-    $.getJSON('https://hobbylap.gridfire.org:8080/tariffs_buy', function(response) {
+    $.getJSON('/tariffs_buy', function(response) {
         tariffs_buy.updateSeries([response])
     });
 
-    $.getJSON('https://hobbylap.gridfire.org:8080/combined_production', function(response) {
+    $.getJSON('/combined_production', function(response) {
         production.updateSeries(response)
     });
 
-    $.getJSON('https://hobbylap.gridfire.org:8080/combined_load', function(response) {
+    $.getJSON('/combined_load', function(response) {
         load.updateSeries(response)
     });
 
-    $.getJSON('https://hobbylap.gridfire.org:8080/forecast_cloud', function(response) {
+    $.getJSON('/forecast_cloud', function(response) {
         cloud.updateSeries([response])
     });
 
-    $.getJSON('https://hobbylap.gridfire.org:8080/forecast_temp', function(response) {
+    $.getJSON('/forecast_temp', function(response) {
         temp.updateSeries([response])
     });
 
