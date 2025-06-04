@@ -370,7 +370,6 @@ impl Dispatcher {
     /// 
     /// * 'reset_last_request' - whether to reset or not
     async fn check_updates(&mut self, reset_last_request: bool) -> Result<(), DispatcherError> {
-        info!("checking for FoxESS updates");
         if reset_last_request {
             self.last_request = Utc::now().timestamp();
         }
