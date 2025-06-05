@@ -41,9 +41,17 @@ pub struct BaseData {
     pub tariffs: Vec<TariffValues>,
 }
 
+/// Available block types
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
+pub enum BlockType {
+    Charge,
+    Hold,
+    Use,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Block {
-    pub block_type: String,
+    pub block_type: BlockType,
     pub start_time: DateTime<Local>,
     pub end_time: DateTime<Local>,
     pub soc_in: usize,

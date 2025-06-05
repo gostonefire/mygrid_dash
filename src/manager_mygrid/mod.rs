@@ -46,6 +46,7 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
     let mut consumption: HashMap<DateTime<Utc>, DataItem<f64>> = HashMap::new();
     let mut tariffs_buy: HashMap<DateTime<Utc>, DataItem<f64>> = HashMap::new();
     let mut tariffs_sell: HashMap<DateTime<Utc>, DataItem<f64>> = HashMap::new();
+    let mut tariffs_policy: HashMap<DateTime<Local>, f64> = HashMap::new();
 
     for file in files {
         let json = tokio::fs::read_to_string(file).await?;
@@ -71,6 +72,7 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
             let datetime = d.date_time.with_timezone(&Utc);
             tariffs_buy.insert(datetime, DataItem { x: d.date_time, y: d.buy });
             tariffs_sell.insert(datetime, DataItem { x: d.date_time, y: d.sell });
+            tariffs_policy.insert(d.date_time, d.buy);
         }
     }
 
@@ -81,6 +83,7 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
         load: Vec::new(),
         tariffs_buy: Vec::new(),
         tariffs_sell: Vec::new(),
+        policy_tariffs: tariffs_policy,
     };
 
     let model = DataItem { x: Default::default(), y: 0.0 };

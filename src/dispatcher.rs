@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ops::Add;
 use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
 use log::{error, info};
@@ -9,7 +9,8 @@ use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series};
+use crate::usage_policy::get_policy;
 
 pub enum Cmd {
     CombinedRealTime,
@@ -92,13 +93,14 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
 /// Dispatcher struct
 ///
 struct Dispatcher {
-    schedule: Option<Vec<Block>>,
+    schedule: Vec<Block>,
     mygrid_data: MygridData,
     fox_cloud: Fox,
     schedule_path: String,
     base_data_path: String,
     history_data: HistoryData,
     real_time_data: RealTimeData,
+    usage_policy: u8,
     last_request: i64,
 }
 
@@ -112,7 +114,7 @@ impl Dispatcher {
         let fox_cloud = Fox::new(&config.fox_ess)?;
 
         Ok(Self {
-            schedule: None,
+            schedule: Vec::new(),
             mygrid_data: MygridData {
                 forecast_temp: Vec::new(),
                 forecast_cloud: Vec::new(),
@@ -120,6 +122,7 @@ impl Dispatcher {
                 load: Vec::new(),
                 tariffs_buy: Vec::new(),
                 tariffs_sell: Vec::new(),
+                policy_tariffs: HashMap::new(),
             },
             fox_cloud,
             schedule_path: config.mygrid.schedule_path.clone(),
@@ -138,6 +141,7 @@ impl Dispatcher {
                 load_data: VecDeque::new(),
                 timestamp: 0,
             },
+            usage_policy: 0,
             last_request: 0,
         })
     }
@@ -174,9 +178,12 @@ impl Dispatcher {
                 ],
             },            
             Series {
-                name: "SoC".to_string(),
+                name: "Combined".to_string(),
                 chart_type: String::new(),
-                data: &vec![DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc }],
+                data: &vec![
+                    DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc },
+                    DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy }
+                ],
             },
         );
 
@@ -318,7 +325,7 @@ impl Dispatcher {
     /// current hour and onward to keep an entire day in stock.
     /// 
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
-        self.schedule =  Some(get_schedule(&self.schedule_path).await?);
+        self.schedule =  get_schedule(&self.schedule_path).await?;
         
         let local_now = Local::now();
         let from = local_now.duration_trunc(TimeDelta::days(1))?;
@@ -364,6 +371,23 @@ impl Dispatcher {
         Ok(())
     }
     
+    /// Evaluates usage policy
+    /// 
+    fn evaluate_policy(&mut self) -> Result<(), DispatcherError> {
+        let data = PolicyData {
+            schedule: &self.schedule,
+            prod: self.real_time_data.prod,
+            load: self.real_time_data.load,
+            soc: self.real_time_data.soc,
+            policy_tariffs: &self.mygrid_data.policy_tariffs,
+            date_time: Local::now().duration_trunc(TimeDelta::hours(1))?,
+        };
+        
+        self.usage_policy = get_policy(data) * 10;
+        
+        Ok(())
+    }
+    
     /// Check if it is time to update data from FoxESS
     /// 
     /// # Arguments
@@ -377,6 +401,7 @@ impl Dispatcher {
         if Utc::now().timestamp() - self.last_request <= 1800 {
             let _ = self.update_real_time_data().await?;
             let _ = self.update_history().await?;
+            let _ = self.evaluate_policy()?;
         }
         
         Ok(())

@@ -59,7 +59,7 @@ Apex.chart = {
     defaultLocale: "se"
 }
 
-// combined realtime values for production, load and SoC (State of Charge)
+// combined realtime values for production and load
 //
 let realtime_options = {
     series: [],
@@ -72,6 +72,9 @@ let realtime_options = {
         zoom: {
             enabled: false,
         },
+    },
+    legend: {
+        show: false,
     },
     colors: ["#00E396", "#FF4560"],
     stroke: {
@@ -122,7 +125,7 @@ let realtime_options = {
             show: false
         },
         labels: {
-            show: false,
+            show: true,
         },
     },
     tooltip: {
@@ -167,7 +170,19 @@ let soc_options = {
             enabled: false,
         },
     },
-    colors: ["#FEB019"],
+    legend: {
+        show: false,
+    },
+    colors: ["#FEB019",
+        function({ value }) {
+            if (value <= 2) {
+                return "#FF4560"
+            } else if (value > 2 && value <= 7) {
+                return "#FEB019"
+            } else {
+                return "#00E396"
+            }
+        }],
     stroke: {
         show: true,
         width: 2,
@@ -178,7 +193,8 @@ let soc_options = {
     },
     plotOptions: {
         bar: {
-            columnWidth: '40%',
+            columnWidth: '50%',
+            distributed: true,
             dataLabels: {
                 position: 'top',
             }
@@ -223,7 +239,7 @@ let soc_options = {
         enabled: false,
     },
     title: {
-        text: 'Current SoC',
+        text: 'Current SoC & Policy',
         floating: true,
         offsetY: 0,
         align: 'center',
@@ -666,8 +682,8 @@ temp.render();
 
 function refreshData() {
     $.getJSON('/combined_realtime', function(response) {
-        realtime.updateSeries([response[0]])
-        soc.updateSeries([response[1]])
+        realtime.updateSeries([response[0]]);
+        soc.updateSeries([response[1]]);
     });
 
     $.getJSON('/tariffs_buy', function(response) {

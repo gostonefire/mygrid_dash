@@ -1,6 +1,7 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use chrono::{DateTime, DurationRound, Local, RoundingError, TimeDelta, Utc};
 use serde::Serialize;
+use crate::manager_mygrid::models::Block;
 use crate::serialize_timestamp;
 
 #[derive(Serialize)]
@@ -46,6 +47,16 @@ pub struct MygridData {
     pub load: Vec<DataItem<f64>>,
     pub tariffs_buy: Vec<DataItem<f64>>,
     pub tariffs_sell: Vec<DataItem<f64>>,
+    pub policy_tariffs: HashMap<DateTime<Local>, f64>,
+}
+
+pub struct PolicyData<'a> {
+    pub schedule: &'a Vec<Block>, 
+    pub prod: f64, 
+    pub load: f64, 
+    pub soc: u8, 
+    pub policy_tariffs: &'a HashMap<DateTime<Local>, f64>, 
+    pub date_time: DateTime<Local>,
 }
 
 pub trait MyGrid {
