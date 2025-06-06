@@ -23,6 +23,7 @@ mod handlers;
 mod serialize_timestamp;
 mod models;
 mod usage_policy;
+mod traits;
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,

@@ -4,7 +4,8 @@ use chrono::{DateTime, Local, TimeDelta, Utc};
 use glob::glob;
 use crate::manager_mygrid::errors::MyGridError;
 use crate::manager_mygrid::models::{BaseData, Block};
-use crate::models::{DataItem, MyGrid, MygridData};
+use crate::models::{DataItem, MygridData};
+use crate::traits::MyGrid;
 
 pub mod models;
 pub mod errors;
