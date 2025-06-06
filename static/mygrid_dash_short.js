@@ -175,9 +175,9 @@ let soc_options = {
     },
     colors: ["#FEB019",
         function({ value }) {
-            if (value <= 2) {
+            if (value <= 20) {
                 return "#FF4560"
-            } else if (value > 2 && value <= 7) {
+            } else if (value > 20 && value < 70) {
                 return "#FEB019"
             } else {
                 return "#00E396"
