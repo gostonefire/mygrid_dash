@@ -60,7 +60,8 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
-                        .service(Files::new("/", "./static").index_file("index.html")),
+                        .service(Files::new("/short", "./static").index_file("index_short.html"))
+                        .service(Files::new("/", "./static").index_file("index.html"))
                 )
         })
             .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?

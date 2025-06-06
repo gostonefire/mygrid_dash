@@ -33,31 +33,50 @@ pub fn get_policy(data: PolicyData) -> u8 {
 ///
 /// * 'data' - a struct containing all necessary data to evaluate policy
 fn summer_policy(data: PolicyData) -> u8 {
-    let consume_date_time = net_consume_at(&data.schedule);
-    let color_consume_future = tariff_color_future(consume_date_time, &data.policy_tariffs);
-    let color_near_future = tariff_color_future(Some(data.date_time), &data.policy_tariffs);
-    let color_now = tariff_color_now(data.date_time, &data.policy_tariffs);
-    let is_consuming = data.prod < data.load;
+    let soc_full = data.soc > 96;
+    let soc_hi = data.soc > 50;
+    let soc_med = data.soc > 20;
+    let soc_low = data.soc > 10;
+    let soc_empty = true;
     
-    if !is_consuming && data.soc >= 97 {
+    let far_color = tariff_color_future(net_consume_at(&data.schedule), &data.policy_tariffs);
+    let near_color = tariff_color_future(Some(data.date_time), &data.policy_tariffs).unwrap_or(TariffColor::Green);
+    let now_color = tariff_color_now(data.date_time, &data.policy_tariffs);
+    let is_prod = data.prod > data.load;
+    
+    if soc_full && far_color.is_none() && is_prod {
         10
-    } else if data.prod - data.load > 3.0 && data.soc > 20 {
+    } else if soc_full && far_color.is_none() {
         9
-    } else if !is_consuming && data.soc >= 50 {
+    } else if soc_hi && far_color.is_none() {
         8
-    } else if is_consuming && data.soc < 50 && consume_date_time.is_none() {
+    } else if soc_hi && is_prod {
         7
-    } else if is_consuming && data.soc < 50 && color_near_future == TariffColor::Green {
+    } else if soc_hi && far_color.as_ref().is_some_and(|c| *c == TariffColor::Green) {
         6
-    } else if is_consuming && data.soc < 20 && color_near_future == TariffColor::Green {
+    } else if soc_hi && far_color.as_ref().is_some_and(|c| *c == TariffColor::Yellow) {
         5
-    } else if is_consuming && data.soc < 50 && consume_date_time.is_some() && color_consume_future == TariffColor::Yellow {
+    } else if soc_hi && far_color.as_ref().is_some_and(|c| *c == TariffColor::Red) {
         4
-    } else if is_consuming && data.soc < 50 && consume_date_time.is_some() && color_consume_future == TariffColor::Red {
+    } else if soc_med && far_color.is_none() {
+        7
+    } else if soc_med && far_color.as_ref().is_some_and(|c| *c == TariffColor::Green) {
+        6
+    }  else if soc_med && far_color.as_ref().is_some_and(|c| *c == TariffColor::Yellow) {
+        5
+    } else if soc_med && far_color.as_ref().is_some_and(|c| *c == TariffColor::Red) {
+        4
+    } else if soc_low && near_color == TariffColor::Green {
+        4
+    } else if soc_low && near_color == TariffColor::Yellow {
         3
-    } else if is_consuming && data.soc <= 10 && color_now == TariffColor::Yellow {
+    } else if soc_low && near_color == TariffColor::Red {
         2
-    }  else if is_consuming && data.soc <= 10 && color_now == TariffColor::Red {
+    } else if soc_empty && now_color == TariffColor::Green {
+        3
+    } else if soc_empty && now_color == TariffColor::Yellow {
+        2
+    } else if soc_empty && now_color == TariffColor::Red {
         1
     } else {
         error!("summer policy fell through rules");
@@ -72,32 +91,43 @@ fn summer_policy(data: PolicyData) -> u8 {
 ///
 /// * 'data' - a struct containing all necessary data to evaluate policy
 fn winter_policy(data: PolicyData) -> u8 {
-    let color_near_future = tariff_color_future(Some(data.date_time), &data.policy_tariffs);
-    let color_now = tariff_color_now(data.date_time, &data.policy_tariffs);
-    let is_consuming = data.prod < data.load;
+    let soc_hi = data.soc > 50;
+    let soc_med = data.soc > 20;
+    let soc_low = data.soc > 10;
+    let soc_empty = true;
 
-    if !is_consuming && data.soc >= 50 {
+    let near_color = tariff_color_future(Some(data.date_time), &data.policy_tariffs).unwrap_or(TariffColor::Green);
+    let now_color = tariff_color_now(data.date_time, &data.policy_tariffs);
+    let is_prod = data.prod > data.load;
+
+    if soc_hi && is_prod && near_color == TariffColor::Green {
         10
-    } else if data.soc >= 50 && color_near_future == TariffColor::Green {
+    } else if soc_hi && near_color == TariffColor::Green {
         9
-    } else if data.soc < 50 && color_near_future == TariffColor::Green {
-        8
-    } else if data.soc < 20 && color_near_future == TariffColor::Green {
-        7
-    } else if data.soc >= 50 && color_near_future == TariffColor::Yellow {
+    } else if soc_hi && near_color == TariffColor::Yellow {
         6
-    } else if data.soc < 50 && color_near_future == TariffColor::Yellow {
-        5
-    } else if data.soc >= 50 && color_near_future == TariffColor::Red {
+    } else if soc_hi && near_color == TariffColor::Red {
         4
-    } else if data.soc < 50 && color_near_future == TariffColor::Red {
+    } else if soc_med && near_color == TariffColor::Green {
+        8
+    } else if soc_med && near_color == TariffColor::Yellow {
+        5
+    } else if soc_med && near_color == TariffColor::Red {
         3
-    } else if data.soc <= 10 && color_now == TariffColor::Yellow {
+    } else if soc_low && near_color == TariffColor::Green {
+        7
+    } else if soc_low && near_color == TariffColor::Yellow {
+        4
+    } else if soc_low && near_color == TariffColor::Red {
         2
-    }  else if data.soc <= 10 && color_now == TariffColor::Red {
+    } else if soc_empty && now_color == TariffColor::Green {
+        6
+    } else if soc_empty && now_color == TariffColor::Yellow {
+        3
+    } else if soc_empty && now_color == TariffColor::Red {
         1
     } else {
-        error!("summer policy fell through rules");
+        error!("winter policy fell through rules");
         1
     }
 }
@@ -113,13 +143,12 @@ fn net_consume_at(data: &Vec<Block>) -> Option<DateTime<Local>> {
 }
 
 /// Returns the tariff color in the future starting from the given datetime and 4 hours further
-/// If no date is given the color is defaulted to Green.
 /// 
 /// # Arguments
 /// 
 /// * 'date_time' - a datetime (hour) to start evaluating from
 /// * 'tariffs' - hourly buy tariffs
-fn tariff_color_future(date_time: Option<DateTime<Local>>, tariffs: &HashMap<DateTime<Local>, f64>) -> TariffColor {
+fn tariff_color_future(date_time: Option<DateTime<Local>>, tariffs: &HashMap<DateTime<Local>, f64>) -> Option<TariffColor> {
     if let Some(date_time) = date_time {
         let mut max_cost: f64 = 0.0;
 
@@ -128,9 +157,9 @@ fn tariff_color_future(date_time: Option<DateTime<Local>>, tariffs: &HashMap<Dat
                 max_cost = max_cost.max(cost);
             }
         }
-        cost_to_color(Some(max_cost))
+        Some(cost_to_color(Some(max_cost)))
     } else {
-        TariffColor::Green
+        None
     }
 }
 
