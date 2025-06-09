@@ -24,6 +24,7 @@ mod serialize_timestamp;
 mod models;
 mod usage_policy;
 mod traits;
+mod manager_weather;
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
@@ -58,6 +59,7 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(forecast_temp)
                 .service(forecast_cloud)
                 .service(tariffs_buy)
+                .service(temperature)
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))

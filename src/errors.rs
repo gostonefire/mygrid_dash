@@ -94,6 +94,9 @@ impl From<chrono::round::RoundingError> for DispatcherError {
 impl From<serde_json::Error> for DispatcherError {
     fn from(e: serde_json::Error) -> Self { DispatcherError(e.to_string()) }
 }
+impl From<WeatherError> for DispatcherError {
+    fn from(e: WeatherError) -> Self { DispatcherError(e.to_string()) }
+}
 
 pub struct WeatherError(pub String);
 impl fmt::Display for WeatherError {

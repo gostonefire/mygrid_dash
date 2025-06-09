@@ -4,12 +4,14 @@ use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, 
 use log::{error, info};
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use crate::errors::DispatcherError;
+use crate::errors::{DispatcherError, WeatherError};
 use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
+use crate::manager_weather::WeatherBuilder;
 use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series};
+use crate::traits::Weather;
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -20,6 +22,7 @@ pub enum Cmd {
     ForecastTemp,
     ForecastCloud,
     TariffsBuy,
+    Temperature,
 }
 
 
@@ -96,6 +99,7 @@ struct Dispatcher {
     schedule: Vec<Block>,
     mygrid_data: MygridData,
     fox_cloud: Fox,
+    weather: Box<dyn Weather>,
     schedule_path: String,
     base_data_path: String,
     history_data: HistoryData,
@@ -112,7 +116,8 @@ impl Dispatcher {
     /// * 'config' - configuration struct
     async fn new(config: &Config) -> Result<Self, DispatcherError> {
         let fox_cloud = Fox::new(&config.fox_ess)?;
-
+        let weather = WeatherBuilder::new().api_key("some key".to_string()).build()?;
+        
         Ok(Self {
             schedule: Vec::new(),
             mygrid_data: MygridData {
@@ -125,6 +130,7 @@ impl Dispatcher {
                 policy_tariffs: HashMap::new(),
             },
             fox_cloud,
+            weather: Box::new(weather),
             schedule_path: config.mygrid.schedule_path.clone(),
             base_data_path: config.mygrid.base_data_path.clone(),
             history_data: HistoryData {
@@ -160,6 +166,7 @@ impl Dispatcher {
             Cmd::ForecastTemp        => self.get_forecast_temp()?,
             Cmd::ForecastCloud       => self.get_forecast_cloud()?,
             Cmd::TariffsBuy          => self.get_tariffs_buy()?,
+            Cmd::Temperature         => self.get_temperature()?,
         };
 
         Ok(data)
@@ -273,6 +280,19 @@ impl Dispatcher {
         Ok(serde_json::to_string_pretty(&series)?)
     }
 
+    /// Returns the current temperature
+    /// 
+    fn get_temperature(&self) -> Result<String, DispatcherError> {
+        let series: Series<DataItem<f64>> =
+            Series {
+                name: "Temperature".to_string(),
+                chart_type: String::new(),
+                data: &vec![self.weather.get_temperature()?],
+            };
+        
+        Ok(serde_json::to_string_pretty(&series)?)
+    }
+    
     /// Updates all history fields with fresh data, either delta since last update or
     /// from midnight if old data is from yesterday
     /// 

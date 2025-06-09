@@ -85,3 +85,15 @@ async fn tariffs_buy(data: web::Data<AppState>) -> impl Responder {
         HttpResponse::NoContent().finish()
     }
 }
+
+#[get("/temperature")]
+async fn temperature(data: web::Data<AppState>) -> impl Responder {
+    let mut comms = data.comms.lock().await;
+    comms.tx_to_mygrid.send(Cmd::Temperature).unwrap();
+
+    if let Some(json) = comms.rx_from_mygrid.recv().await {
+        HttpResponse::Ok().body(json)
+    } else {
+        HttpResponse::NoContent().finish()
+    }
+}
