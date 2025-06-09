@@ -301,7 +301,7 @@ impl Dispatcher {
         let utc_now = local_now.with_timezone(&Utc);
         
         // Check if update is needed
-        if self.history_data.last_end_time.ordinal0() == utc_now.ordinal0() &&
+        if self.history_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() &&
             utc_now - self.history_data.last_end_time <= Duration::minutes(10) 
         {
             return Ok(())
