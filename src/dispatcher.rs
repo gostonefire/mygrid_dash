@@ -4,14 +4,13 @@ use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, 
 use log::{error, info};
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use crate::errors::{DispatcherError, WeatherError};
+use crate::errors::DispatcherError;
 use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
-use crate::manager_weather::WeatherBuilder;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series};
-use crate::traits::Weather;
+use crate::manager_weather::Weather;
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, WeatherData};
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -99,11 +98,12 @@ struct Dispatcher {
     schedule: Vec<Block>,
     mygrid_data: MygridData,
     fox_cloud: Fox,
-    weather: Box<dyn Weather>,
+    weather: Weather,
     schedule_path: String,
     base_data_path: String,
     history_data: HistoryData,
     real_time_data: RealTimeData,
+    weather_data: WeatherData,
     usage_policy: u8,
     last_request: i64,
 }
@@ -116,7 +116,7 @@ impl Dispatcher {
     /// * 'config' - configuration struct
     async fn new(config: &Config) -> Result<Self, DispatcherError> {
         let fox_cloud = Fox::new(&config.fox_ess)?;
-        let weather = WeatherBuilder::new().api_key("some key".to_string()).build()?;
+        let weather = Weather::new(&config.weather.host)?;
         
         Ok(Self {
             schedule: Vec::new(),
@@ -130,7 +130,7 @@ impl Dispatcher {
                 policy_tariffs: HashMap::new(),
             },
             fox_cloud,
-            weather: Box::new(weather),
+            weather,
             schedule_path: config.mygrid.schedule_path.clone(),
             base_data_path: config.mygrid.base_data_path.clone(),
             history_data: HistoryData {
@@ -146,6 +146,11 @@ impl Dispatcher {
                 prod_data: VecDeque::new(),
                 load_data: VecDeque::new(),
                 timestamp: 0,
+            },
+            weather_data: WeatherData {
+                temp_history: Vec::new(),
+                temp_current: 0.0,
+                last_end_time: Default::default(),
             },
             usage_policy: 0,
             last_request: 0,
@@ -166,7 +171,7 @@ impl Dispatcher {
             Cmd::ForecastTemp        => self.get_forecast_temp()?,
             Cmd::ForecastCloud       => self.get_forecast_cloud()?,
             Cmd::TariffsBuy          => self.get_tariffs_buy()?,
-            Cmd::Temperature         => self.get_temperature()?,
+            Cmd::Temperature         => String::new(),
         };
 
         Ok(data)
@@ -244,12 +249,18 @@ impl Dispatcher {
     /// Returns current whether forecast temperature
     ///
     fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
-        let series: Series<DataItem<f64>> =
+        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
             Series {
-                name: "Temperature".to_string(),
+                name: "Forecast".to_string(),
                 chart_type: String::new(),
                 data: &self.mygrid_data.forecast_temp,
-            };
+            },
+            Series {
+                name: "Actual".to_string(),
+                chart_type: String::new(),
+                data: &self.weather_data.temp_history,
+            },
+        );
 
         Ok(serde_json::to_string_pretty(&series)?)
     }
@@ -280,6 +291,7 @@ impl Dispatcher {
         Ok(serde_json::to_string_pretty(&series)?)
     }
 
+    /*
     /// Returns the current temperature
     /// 
     fn get_temperature(&self) -> Result<String, DispatcherError> {
@@ -291,6 +303,36 @@ impl Dispatcher {
             };
         
         Ok(serde_json::to_string_pretty(&series)?)
+    }
+    
+     */
+    
+    /// Updates weather data
+    /// 
+    async fn update_weather(&mut self) -> Result<(), DispatcherError> {
+        let local_now = Local::now();
+        let utc_now = local_now.with_timezone(&Utc);
+
+        // Check if update is needed
+        if self.weather_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() &&
+            utc_now - self.weather_data.last_end_time < Duration::minutes(5)
+        {
+            return Ok(())
+        }
+        
+        info!("updating weather data");
+        let from = local_now.duration_trunc(TimeDelta::days(1))?;
+        let history = self.weather.get_temp_history(from, local_now, true).await?;
+        let last = history.len();
+        
+        self.weather_data.temp_history = history;
+        if last != 0 {
+            self.weather_data.temp_current = self.weather_data.temp_history[last - 1].y;
+        }
+        
+        self.weather_data.last_end_time = utc_now;
+        
+        Ok(())
     }
     
     /// Updates all history fields with fresh data, either delta since last update or
@@ -419,6 +461,7 @@ impl Dispatcher {
         }
         
         if Utc::now().timestamp() - self.last_request <= 1800 {
+            let _ = self.update_weather().await?;
             let _ = self.update_real_time_data().await?;
             let _ = self.update_history().await?;
             let _ = self.evaluate_policy()?;
@@ -448,35 +491,6 @@ fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
         0.0
     }
 }
-
-/*
-/// Returns the moving averages from the given vector and window size
-/// In order to get the same vector length in the result, the window starts as size 1 and increases
-/// to the given window size.
-///
-/// # Arguments
-///
-/// * 'vec_in' - the raw data vector
-/// * 'window' - the window size that must be a positive integer, zero returns a vector of undefined floats
-fn get_ma(vec_in: &Vec<DataItem<f64>>, mut window: usize) -> Vec<DataItem<f64>> {
-    let mut vec_out: Vec<DataItem<f64>> = Vec::new();
-    let len = vec_in.len();
-
-    if len > 0 {
-        window = window.min(len);
-
-        for i in 1..len+1 {
-            let effective_window = window.min(i);
-            let slice = &vec_in[i-effective_window..i];
-            let y = slice.iter().map(|d| d.y).sum::<f64>() / effective_window as f64;
-            let x = slice.last().map_or(Default::default(), |d| d.x);
-            vec_out.push(DataItem { x, y });
-        }
-    }
-
-    vec_out
-}
-*/
 
 /// Round to two decimals
 /// 

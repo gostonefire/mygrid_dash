@@ -5,7 +5,6 @@ function loadScriptSequentially(file) {
         newScript.setAttribute('async', 'true');
 
         newScript.onload = () => {
-            displayMessage(`${file} loaded successfully`, 'success');
             resolve(); // Resolve the promise
         };
         newScript.onerror = () => {
@@ -40,7 +39,7 @@ function refreshData() {
     });
 
     $.getJSON('/forecast_temp', function(response) {
-        temp.updateSeries([response])
+        temp.updateSeries(response)
     });
 
     let datetime = new Date();

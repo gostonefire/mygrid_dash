@@ -26,6 +26,12 @@ pub struct Series<'a, T> {
     pub data: &'a Vec<T>,
 }
 
+pub struct WeatherData {
+    pub temp_history: Vec<DataItem<f64>>,
+    pub temp_current: f64,
+    pub last_end_time: DateTime<Utc>,
+}
+
 pub struct HistoryData {
     pub soc_history: Vec<DataItem<u8>>,
     pub prod_history: Vec<DataItem<f64>>,

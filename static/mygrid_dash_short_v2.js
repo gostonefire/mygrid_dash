@@ -5,7 +5,6 @@ function loadScriptSequentially(file) {
         newScript.setAttribute('async', 'true');
 
         newScript.onload = () => {
-            displayMessage(`${file} loaded successfully`, 'success');
             resolve(); // Resolve the promise
         };
         newScript.onerror = () => {

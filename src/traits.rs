@@ -1,7 +1,4 @@
 use chrono::{DateTime, Local, RoundingError};
-use log::error;
-use crate::errors::WeatherError;
-use crate::models::DataItem;
 
 pub trait MyGrid {
     type Item;
@@ -23,81 +20,3 @@ pub trait MyGrid {
     fn create_new(&self, date_time: DateTime<Local>) -> Self::Item;
 }
 
-pub trait Weather {
-    
-    /// Returns current temperature
-    ///
-    fn get_temperature(&self) -> Result<DataItem<f64>, WeatherError>;
-
-    /// Returns temperature history
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - history start datetime
-    /// * 'to' - history end time (non-inclusive)
-    fn get_temperature_history(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<Vec<DataItem<f64>>, WeatherError> {
-        error!("get_temperature_history({}, {}) not implemented", from, to);
-        Err("get_temperature_history not implemented")?
-    }
-
-    /// Returns current humidity
-    fn get_humidity(&self) -> Result<DataItem<u8>, WeatherError> {
-        error!("get_humidity not implemented");
-        Err("get_humidity not implemented")?
-    }
-
-    /// Returns humidity history
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - history start datetime
-    /// * 'to' - history end time (non-inclusive)
-    fn get_humidity_history(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<Vec<DataItem<u8>>, WeatherError> {
-        error!("get_humidity_history({}, {}) not implemented", from, to);
-        Err("get_humidity_history not implemented")?
-    }
-
-    /// Returns temperature max within a given period
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - period start datetime
-    /// * 'to' - period end time (non-inclusive)
-    fn get_temperature_max(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<DataItem<f64>, WeatherError> {
-        error!("get_temperature_max({}, {}) not implemented", from, to);
-        Err("get_temperature_max not implemented")?
-    }
-
-    /// Returns temperature min within a given period
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - period start datetime
-    /// * 'to' - period end time (non-inclusive)
-    fn get_temperature_min(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<DataItem<f64>, WeatherError> {
-        error!("get_temperature_min({}, {}) not implemented", from, to);
-        Err("get_temperature_min not implemented")?
-    }
-
-    /// Returns humidity max within a given period
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - period start datetime
-    /// * 'to' - period end time (non-inclusive)
-    fn get_humidity_max(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<DataItem<u8>, WeatherError> {
-        error!("get_humidity_max({}, {}) not implemented", from, to);
-        Err("get_humidity_max not implemented")?
-    }
-
-    /// Returns humidity min within a given period
-    ///
-    /// # Arguments
-    ///
-    /// * 'from' - period start datetime
-    /// * 'to' - period end time (non-inclusive)
-    fn get_humidity_min(&self, from: DateTime<Local>, to: DateTime<Local>) -> Result<DataItem<u8>, WeatherError> {
-        error!("get_humidity_min({}, {}) not implemented", from, to);
-        Err("get_humidity_min not implemented")?
-    }
-}

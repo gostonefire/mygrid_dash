@@ -99,7 +99,7 @@ let temp_options = {
             enabled: false,
         },
     },
-    colors: ["#FEB019"],
+    colors: ["#FEB019", "#00E396"],
     stroke: {
         curve: 'smooth',
         width: 2,

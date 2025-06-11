@@ -24,6 +24,11 @@ pub struct MyGrid {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct Weather {
+    pub host: String,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct General {
     pub log_path: String,
     pub log_to_stdout: bool,
@@ -34,6 +39,7 @@ pub struct Config {
     pub web_server: WebServerParameters,
     pub fox_ess: FoxESS,
     pub mygrid: MyGrid,
+    pub weather: Weather,
     pub general: General,
 }
 
