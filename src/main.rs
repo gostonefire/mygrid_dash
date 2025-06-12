@@ -63,8 +63,7 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
-                        .service(Files::new("/short", "./static").index_file("index_short.html"))
-                        .service(Files::new("/essential", "./static").index_file("index_essential.html"))
+                        .service(Files::new("/full", "./static").index_file("index_full.html"))
                         .service(Files::new("/", "./static").index_file("index.html"))
                 )
         })

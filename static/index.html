@@ -9,39 +9,27 @@
     <link href="./dark.css" rel="stylesheet" />
 
     <style>
-        .flex-outer {
-            display: flex;
-            justify-content: left;
-            flex-flow: row wrap;
-        }
-
-        .flex-row {
-            display: flex;
-            justify-content: space-between;
-            flex-flow: row;
-        }
-
         .flex-column {
             display: flex;
             flex-flow: column;
         }
-
-        #realtime-box, #tariffs-buy, #mygrid, #forecast {
+        .flex-row {
+            display: flex;
+            flex-flow: row;
+            padding: 0 5px 0 0;
+        }
+        #forecast {
             max-width: 800px;
             flex-basis: 100%;
             margin: 10px;
         }
-        #realtime {
-            max-width: 400px;
-            flex-basis: 100%;
+        #policy {
             padding: 0 5px 0 0;
         }
-        #soc {
-            max-width: 400px;
-            flex-basis: 100%;
+        #temperature {
             padding: 0 0 0 5px;
         }
-        #cloud-factor, #temperature, #prod, #load {
+        #tariffs-buy, #temperature, #policy-temp {
             max-width: 800px;
             flex-basis: 100%;
         }
@@ -52,24 +40,16 @@
 </head>
 
 <body>
-<div class="flex-outer">
-    <div class="flex-row" id="realtime-box">
-        <div id="realtime"></div>
-        <div id="soc"></div>
-    </div>
-    <div id="tariffs-buy"></div>
-    <div class="flex-column" id="mygrid">
-        <div id="prod"></div>
-        <div id="load"></div>
-    </div>
     <div class="flex-column" id="forecast">
-        <div id="cloud-factor"></div>
-        <div id="temperature"></div>
+        <div class="flex-row" id="policy-temp">
+            <div id="policy"></div>
+            <div id="temperature"></div>
+        </div>
+        <div id="tariffs-buy"></div>
     </div>
-</div>
 
 
-<script src="./mygrid_dash_v2.js?v=1.4.0"></script>
+<script src="./mygrid_dash_essential_v2.js?v=1.4.0"></script>
 
 </body>
 </html>
