@@ -26,7 +26,7 @@ let temp_options = {
     dataLabels: {
         enabled: true,
         enabledOnSeries: [2],
-        formatter: function (val, opts) {
+        formatter: function (val) {
             return Math.round(val * 10) / 10 + ' ℃'
         },
     },
