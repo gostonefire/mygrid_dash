@@ -59,11 +59,12 @@ async fn main() -> Result<(), UnrecoverableError> {
                 .service(forecast_temp)
                 .service(forecast_cloud)
                 .service(tariffs_buy)
-                .service(temperature)
+                .service(policy)
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
                         .service(Files::new("/short", "./static").index_file("index_short.html"))
+                        .service(Files::new("/essential", "./static").index_file("index_essential.html"))
                         .service(Files::new("/", "./static").index_file("index.html"))
                 )
         })

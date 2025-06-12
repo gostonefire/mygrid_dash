@@ -86,10 +86,10 @@ async fn tariffs_buy(data: web::Data<AppState>) -> impl Responder {
     }
 }
 
-#[get("/temperature")]
-async fn temperature(data: web::Data<AppState>) -> impl Responder {
+#[get("/policy")]
+async fn policy(data: web::Data<AppState>) -> impl Responder {
     let mut comms = data.comms.lock().await;
-    comms.tx_to_mygrid.send(Cmd::Temperature).unwrap();
+    comms.tx_to_mygrid.send(Cmd::Policy).unwrap();
 
     if let Some(json) = comms.rx_from_mygrid.recv().await {
         HttpResponse::Ok().body(json)

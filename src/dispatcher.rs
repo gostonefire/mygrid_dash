@@ -21,7 +21,7 @@ pub enum Cmd {
     ForecastTemp,
     ForecastCloud,
     TariffsBuy,
-    Temperature,
+    Policy,
 }
 
 
@@ -171,13 +171,27 @@ impl Dispatcher {
             Cmd::ForecastTemp        => self.get_forecast_temp()?,
             Cmd::ForecastCloud       => self.get_forecast_cloud()?,
             Cmd::TariffsBuy          => self.get_tariffs_buy()?,
-            Cmd::Temperature         => String::new(),
+            Cmd::Policy              => self.get_policy()?,
         };
 
         Ok(data)
     }
 
-    /// Returns a combined series of real time data of load, production and SoC
+    /// Returns policy
+    fn get_policy(&self) -> Result<String, DispatcherError>{
+        let series: Series<DataPoint<u8>> = 
+            Series {
+                name: "Combined".to_string(),
+                chart_type: String::new(),
+                data: &vec![
+                    DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy }
+                ],
+            };
+
+        Ok(serde_json::to_string_pretty(&series)?)
+    }
+    
+    /// Returns a combined series of real time data of load, production, SoC and policy
     ///
     fn get_combined_real_time(&self) -> Result<String, DispatcherError> {
         let series: (Series<DataPoint<f64>>, Series<DataPoint<u8>>) = (
@@ -249,7 +263,7 @@ impl Dispatcher {
     /// Returns current whether forecast temperature
     ///
     fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
+        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>, Series<DataItem<f64>>) = (
             Series {
                 name: "Forecast".to_string(),
                 chart_type: String::new(),
@@ -259,6 +273,11 @@ impl Dispatcher {
                 name: "Actual".to_string(),
                 chart_type: String::new(),
                 data: &self.weather_data.temp_history,
+            },
+            Series {
+                name: "Current".to_string(),
+                chart_type: "scatter".to_string(),
+                data: &vec![DataItem{ x: Local::now(), y: self.weather_data.temp_current }],
             },
         );
 

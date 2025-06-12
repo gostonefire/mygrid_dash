@@ -17,29 +17,16 @@ function loadScriptSequentially(file) {
 }
 
 function refreshData() {
-    $.getJSON('/combined_realtime', function(response) {
-        realtime.updateSeries([response[0]]);
-        soc.updateSeries([response[1]]);
-    });
-
-    $.getJSON('/tariffs_buy', function(response) {
-        tariffs_buy.updateSeries([response])
-    });
-
-    $.getJSON('/combined_production', function(response) {
-        production.updateSeries(response)
-    });
-
-    $.getJSON('/combined_load', function(response) {
-        load.updateSeries(response)
-    });
-
-    $.getJSON('/forecast_cloud', function(response) {
-        cloud.updateSeries([response])
+    $.getJSON('/policy', function(response) {
+        policy.updateSeries([response])
     });
 
     $.getJSON('/forecast_temp', function(response) {
         temp.updateSeries(response)
+    });
+
+    $.getJSON('/tariffs_buy', function(response) {
+        tariffs_buy.updateSeries([response])
     });
 
     let datetime = new Date();
@@ -68,13 +55,9 @@ function refreshData() {
 }
 
 loadScriptSequentially('locale_se.js')
-    .then(() => loadScriptSequentially('mygrid_realtime.js'))
-    .then(() => loadScriptSequentially('mygrid_soc_policy.js'))
-    .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
-    .then(() => loadScriptSequentially('mygrid_prod.js'))
-    .then(() => loadScriptSequentially('mygrid_load.js'))
-    .then(() => loadScriptSequentially('mygrid_cloud.js'))
+    .then(() => loadScriptSequentially('mygrid_policy.js'))
     .then(() => loadScriptSequentially('mygrid_temp.js'))
+    .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
     .then(() => {
         refreshData();
         setInterval(() => {

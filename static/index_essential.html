@@ -9,32 +9,29 @@
     <link href="./dark.css" rel="stylesheet" />
 
     <style>
-        .flex-outer {
+        .flex-column {
             display: flex;
-            justify-content: left;
-            flex-flow: row wrap;
+            flex-flow: column;
         }
-
         .flex-row {
             display: flex;
-            justify-content: space-between;
             flex-flow: row;
+            padding: 0 5px 0 0;
         }
-
-        #realtime-box, #tariffs-buy {
+        #forecast {
             max-width: 800px;
             flex-basis: 100%;
             margin: 10px;
         }
-        #realtime {
-            max-width: 400px;
-            flex-basis: 100%;
+        #policy {
             padding: 0 5px 0 0;
         }
-        #soc {
-            max-width: 400px;
-            flex-basis: 100%;
+        #temperature {
             padding: 0 0 0 5px;
+        }
+        #tariffs-buy, #temperature, #policy-temp {
+            max-width: 800px;
+            flex-basis: 100%;
         }
     </style>
 
@@ -43,16 +40,16 @@
 </head>
 
 <body>
-<div class="flex-outer">
-    <div class="flex-row" id="realtime-box">
-        <div id="realtime"></div>
-        <div id="soc"></div>
+    <div class="flex-column" id="forecast">
+        <div class="flex-row" id="policy-temp">
+            <div id="policy"></div>
+            <div id="temperature"></div>
+        </div>
+        <div id="tariffs-buy"></div>
     </div>
-    <div id="tariffs-buy"></div>
-</div>
 
 
-<script src="./mygrid_dash_short_v2.js?v=1.4.0"></script>
+<script src="./mygrid_dash_essential_v2.js?v=1.4.0"></script>
 
 </body>
 </html>
