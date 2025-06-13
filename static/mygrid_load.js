@@ -34,7 +34,7 @@ let load_options = {
             show: true,
             minWidth: 30,
             formatter: function (val) {
-                return val + " kWh";
+                return val + " kW";
             }
         }
     },

@@ -59,7 +59,7 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
             forecast_cloud.insert(datetime, DataItem { x: d.date_time, y: 1.0 - d.cloud_factor });
         }
 
-        for d in base_data.production {
+        for d in base_data.production_kw {
             let datetime = d.date_time.with_timezone(&Utc);
             production.insert(datetime, DataItem { x: d.date_time, y: to_kw(d.power) });
         }
