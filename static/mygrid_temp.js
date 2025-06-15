@@ -14,7 +14,7 @@ let temp_options = {
             enabled: false,
         },
     },
-    colors: ["#FEB019", "#00E396", "#FF4560"],
+    colors: ["#FEB019", "#00E396"],
     stroke: {
         curve: 'smooth',
         width: 2,
@@ -22,13 +22,6 @@ let temp_options = {
     fill: {
         type:'solid',
         opacity: 1,
-    },
-    dataLabels: {
-        enabled: true,
-        enabledOnSeries: [2],
-        formatter: function (val) {
-            return Math.round(val * 10) / 10 + ' ℃'
-        },
     },
     yaxis: {
         axisBorder: {

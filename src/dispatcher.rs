@@ -178,15 +178,9 @@ impl Dispatcher {
     }
 
     /// Returns policy
+    /// 
     fn get_policy(&self) -> Result<String, DispatcherError>{
-        let series: Series<DataPoint<u8>> = 
-            Series {
-                name: "Combined".to_string(),
-                chart_type: String::new(),
-                data: &vec![
-                    DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy }
-                ],
-            };
+        let series: DataPoint<u8> = DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy };
 
         Ok(serde_json::to_string_pretty(&series)?)
     }
@@ -263,7 +257,7 @@ impl Dispatcher {
     /// Returns current whether forecast temperature
     ///
     fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>, Series<DataItem<f64>>) = (
+        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>, f64) = (
             Series {
                 name: "Forecast".to_string(),
                 chart_type: String::new(),
@@ -274,11 +268,7 @@ impl Dispatcher {
                 chart_type: String::new(),
                 data: &self.weather_data.temp_history,
             },
-            Series {
-                name: "Current".to_string(),
-                chart_type: "scatter".to_string(),
-                data: &vec![DataItem{ x: Local::now(), y: self.weather_data.temp_current }],
-            },
+            self.weather_data.temp_current,
         );
 
         Ok(serde_json::to_string_pretty(&series)?)

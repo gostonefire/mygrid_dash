@@ -9,7 +9,47 @@
     <link href="./dark.css" rel="stylesheet" />
 
     <style>
-        .flex-outer {
+        #header {
+            max-width: 100%;
+            flex-basis: 100%;
+            border: 2px solid darkcyan;
+            margin-bottom: 10px;
+            margin-top: 10px;
+        }
+        #current-temp {
+            color: white;
+            margin: 10px;
+        }
+        #policy-block {
+            color: white;
+        }
+        #policy-bar-block {
+            height: 30px;
+            width: 150px;
+            margin: 0 0 0 10px;
+            border-radius: 10px;
+            border: 2px solid darkcyan;
+            background-color: rgba(128, 128, 128, 0.2);
+            overflow: hidden;
+        }
+        #policy-bar {
+            height: 100%;
+            width: 70%;
+            background-color: green;
+        }
+        #pane-shift {
+            width: 70px;
+            height: 45px;
+            margin: 5px 5px 5px 45px;
+            border-radius: 5px;
+            border: 2px solid darkcyan;
+            background-color: rgba(128, 128, 128, 0.2);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+
+        }
+        .flex-charts {
             display: flex;
             justify-content: left;
             flex-flow: row wrap;
@@ -19,11 +59,13 @@
             display: flex;
             justify-content: space-between;
             flex-flow: row;
+            align-items: center;
         }
 
         .flex-column {
             display: flex;
             flex-flow: column;
+            margin: 10px;
         }
 
         #realtime-box, #tariffs-buy, #mygrid, #forecast {
@@ -52,24 +94,36 @@
 </head>
 
 <body>
-<div class="flex-outer">
-    <div class="flex-row" id="realtime-box">
-        <div id="realtime"></div>
-        <div id="soc"></div>
+<div class="flex-column">
+    <div class="flex-row" id="header">
+        <h1 id="current-temp">-- ℃</h1>
+        <div class="flex-row" id="policy-block">
+            <h3>Policy:</h3>
+            <div id="policy-bar-block">
+                <div id="policy-bar"></div>
+            </div>
+        </div>
+        <button type="button" id="pane-shift" onclick="window.location.href = '/';">Small</button>
     </div>
-    <div id="tariffs-buy"></div>
-    <div class="flex-column" id="mygrid">
-        <div id="prod"></div>
-        <div id="load"></div>
-    </div>
-    <div class="flex-column" id="forecast">
-        <div id="cloud-factor"></div>
-        <div id="temperature"></div>
+    <div class="flex-charts">
+        <div class="flex-row" id="realtime-box">
+            <div id="realtime"></div>
+            <div id="soc"></div>
+        </div>
+        <div id="tariffs-buy"></div>
+        <div class="flex-column" id="mygrid">
+            <div id="prod"></div>
+            <div id="load"></div>
+        </div>
+        <div class="flex-column" id="forecast">
+            <div id="cloud-factor"></div>
+            <div id="temperature"></div>
+        </div>
     </div>
 </div>
 
 
-<script src="./mygrid_dash_v2.js?v=1.4.1"></script>
+<script src="./mygrid_dash_v2.js?v=1.4.2"></script>
 
 </body>
 </html>

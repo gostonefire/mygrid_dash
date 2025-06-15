@@ -16,20 +16,55 @@
         .flex-row {
             display: flex;
             flex-flow: row;
-            padding: 0 5px 0 0;
+            justify-content: space-between;
+            align-items: center;
         }
         #forecast {
             max-width: 800px;
             flex-basis: 100%;
             margin: 10px;
         }
-        #policy {
-            padding: 0 5px 0 0;
+        #header {
+            max-width: 800px;
+            flex-basis: 100%;
+            border: 2px solid darkcyan;
+            margin-bottom: 10px;
+            margin-top: 10px;
         }
-        #temperature {
-            padding: 0 0 0 5px;
+        #current-temp {
+            color: white;
+            margin: 10px;
         }
-        #tariffs-buy, #temperature, #policy-temp {
+        #policy-block {
+            color: white;
+        }
+        #policy-bar-block {
+            height: 30px;
+            width: 150px;
+            margin: 0 0 0 10px;
+            border-radius: 10px;
+            border: 2px solid darkcyan;
+            background-color: rgba(128, 128, 128, 0.2);
+            overflow: hidden;
+        }
+        #policy-bar {
+            height: 100%;
+            width: 70%;
+            background-color: green;
+        }
+        #pane-shift {
+            width: 70px;
+            height: 45px;
+            margin: 5px 5px 5px 45px;
+            border-radius: 5px;
+            border: 2px solid darkcyan;
+            background-color: rgba(128, 128, 128, 0.2);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+
+        }
+        #tariffs-buy, #temperature {
             max-width: 800px;
             flex-basis: 100%;
         }
@@ -41,15 +76,22 @@
 
 <body>
     <div class="flex-column" id="forecast">
-        <div class="flex-row" id="policy-temp">
-            <div id="policy"></div>
-            <div id="temperature"></div>
+        <div class="flex-row" id="header">
+            <h1 id="current-temp">-- ℃</h1>
+            <div class="flex-row" id="policy-block">
+                <h3>Policy:</h3>
+                <div id="policy-bar-block">
+                    <div id="policy-bar"></div>
+                </div>
+            </div>
+            <button type="button" id="pane-shift" onclick="window.location.href = '/full/';">Full</button>
         </div>
+        <div id="temperature"></div>
         <div id="tariffs-buy"></div>
     </div>
 
 
-<script src="./mygrid_dash_essential_v2.js?v=1.4.1"></script>
+<script src="./mygrid_dash_essential_v2.js?v=1.4.2"></script>
 
 </body>
 </html>

@@ -17,6 +17,17 @@ function loadScriptSequentially(file) {
 }
 
 function refreshData() {
+    $.getJSON('/policy', function(response) {
+        let color = "LimeGreen";
+        if (response.y <= 20) {
+            color = "Red"
+        } else if (response.y > 20 && response.y < 70) {
+            color = "Yellow"
+        }
+
+        $("#policy-bar").width(response.y + "%").css("background-color", color);
+    });
+
     $.getJSON('/combined_realtime', function(response) {
         realtime.updateSeries([response[0]]);
         soc.updateSeries([response[1]]);
@@ -39,7 +50,8 @@ function refreshData() {
     });
 
     $.getJSON('/forecast_temp', function(response) {
-        temp.updateSeries(response)
+        temp.updateSeries(response.slice(0,2));
+        $("#current-temp").text(Math.round(response[2] * 10) / 10 + " ℃");
     });
 
     let datetime = new Date();
