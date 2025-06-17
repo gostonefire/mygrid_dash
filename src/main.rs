@@ -52,14 +52,9 @@ async fn main() -> Result<(), UnrecoverableError> {
     tokio::spawn(HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(AppState {comms: web_comms.clone()}))
-                .service(combined_realtime)
-                .service(combined_production)
-                .service(combined_load)
+                .service(small_dash_data)
+                .service(full_dash_data)
                 .service(schedule)
-                .service(forecast_temp)
-                .service(forecast_cloud)
-                .service(tariffs_buy)
-                .service(policy)
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))

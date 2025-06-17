@@ -42,10 +42,10 @@ let prod_options = {
         position: 'bottom',
         type: 'datetime',
         axisBorder: {
-            show: false
+            show: false,
         },
         axisTicks: {
-            show: false,
+            show: true,
         },
         labels: {
             show: false,

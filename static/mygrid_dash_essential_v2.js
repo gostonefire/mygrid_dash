@@ -17,26 +17,20 @@ function loadScriptSequentially(file) {
 }
 
 function refreshData() {
-    $.getJSON('/policy', function(response) {
+    $.getJSON('/small_dash_data', function(resp) {
         let color = "LimeGreen";
-        if (response.y <= 20) {
+        if (resp.policy <= 20) {
             color = "Red"
-        } else if (response.y > 20 && response.y < 70) {
+        } else if (resp.policy > 20 && resp.policy < 70) {
             color = "Yellow"
         }
+        $("#policy-bar").width(resp.policy + "%").css("background-color", color);
+        $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
 
-        $("#policy-bar").width(response.y + "%").css("background-color", color);
+        temp.updateSeries(resp.temp_diagram);
+        tariffs_buy.updateSeries([resp.tariffs_buy]);
     });
-
-    $.getJSON('/forecast_temp', function(response) {
-        temp.updateSeries(response.slice(0,2));
-        $("#current-temp").text(Math.round(response[2] * 10) / 10 + " ℃");
-    });
-
-    $.getJSON('/tariffs_buy', function(response) {
-        tariffs_buy.updateSeries([response]);
-    });
-
+    
     let datetime = new Date();
     let datehour = new Date();
     datehour.setMinutes(0,0,0);

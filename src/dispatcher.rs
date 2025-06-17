@@ -2,6 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::ops::Add;
 use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
 use log::{error, info};
+use serde::Serialize;
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::DispatcherError;
@@ -14,14 +15,9 @@ use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, Re
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
-    CombinedRealTime,
-    CombinedProduction,
-    CombinedLoad,
+    SmallDashData,
+    FullDashData,
     Schedule,
-    ForecastTemp,
-    ForecastCloud,
-    TariffsBuy,
-    Policy,
 }
 
 
@@ -164,88 +160,132 @@ impl Dispatcher {
     /// * 'cmd' - the command to evaluate and execute
     async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String, DispatcherError> {
         let data = match cmd {
-            Cmd::CombinedRealTime    => self.get_combined_real_time()?,
-            Cmd::CombinedProduction  => self.get_combined_production()?,
-            Cmd::CombinedLoad        => self.get_combined_load()?,
+            Cmd::SmallDashData       => self.get_small_dash_data()?,
+            Cmd::FullDashData        => self.get_full_dash_data()?,
             Cmd::Schedule            => self.get_schedule()?,
-            Cmd::ForecastTemp        => self.get_forecast_temp()?,
-            Cmd::ForecastCloud       => self.get_forecast_cloud()?,
-            Cmd::TariffsBuy          => self.get_tariffs_buy()?,
-            Cmd::Policy              => self.get_policy()?,
         };
 
         Ok(data)
     }
-
-    /// Returns policy
-    /// 
-    fn get_policy(&self) -> Result<String, DispatcherError>{
-        let series: DataPoint<u8> = DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy };
-
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
     
-    /// Returns a combined series of real time data of load, production, SoC and policy
+    /// Returns a json object with all necessary data for the small dash
+    /// 
+    fn get_small_dash_data(&self) -> Result<String, DispatcherError> {
+        #[derive(Serialize)]
+        struct SmallDashData<'a> {
+            policy: u8,
+            temp_current: f64,
+            temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
+            tariffs_buy: Series<'a, DataItem<f64>>,
+        }
+        
+        let reply = SmallDashData {
+            policy: self.usage_policy,
+            temp_current: self.weather_data.temp_current,
+            temp_diagram: (
+                Series {
+                    name: "Forecast".to_string(),
+                    chart_type: String::new(),
+                    data: &self.mygrid_data.forecast_temp,
+                },
+                Series {
+                    name: "Actual".to_string(),
+                    chart_type: String::new(),
+                    data: &self.weather_data.temp_history,
+                },
+            ),
+            tariffs_buy: Series {
+                name: "Tariffs Buy".to_string(),
+                chart_type: String::new(),
+                data: &self.mygrid_data.tariffs_buy,
+            }
+        };
+        Ok(serde_json::to_string_pretty(&reply)?)
+    }
+
+    /// Returns a json object with all necessary data for the full dash
     ///
-    fn get_combined_real_time(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataPoint<f64>>, Series<DataPoint<u8>>) = (
-            Series {
-                name: "Combined".to_string(),
+    fn get_full_dash_data(&self) -> Result<String, DispatcherError> {
+        #[derive(Serialize)]
+        struct FullDashData<'a> {
+            policy: u8,
+            temp_current: f64,
+            current_prod_load: Series<'a, DataPoint<f64>>,
+            current_soc_policy: Series<'a, DataPoint<u8>>,
+            tariffs_buy: Series<'a, DataItem<f64>>,
+            prod_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
+            load_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
+            cloud_diagram: Series<'a, DataItem<f64>>,
+            temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
+        }
+
+        let reply = FullDashData {
+            policy: self.usage_policy,
+            temp_current: self.weather_data.temp_current,
+            current_prod_load: Series {
+                name: String::new(),
                 chart_type: String::new(),
                 data: &vec![
                     DataPoint { x: "Production".to_string(), y: self.real_time_data.prod },
                     DataPoint { x: "Load".to_string(), y: self.real_time_data.load }
                 ],
-            },            
-            Series {
-                name: "Combined".to_string(),
+            },
+            current_soc_policy: Series {
+                name: String::new(),
                 chart_type: String::new(),
                 data: &vec![
                     DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc },
                     DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy }
                 ],
             },
-        );
-
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-    
-    /// Returns a combined series of estimated production and production history
-    /// 
-    fn get_combined_production(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
-            Series {
-                name: "Estimated Production".to_string(),
-                chart_type: "area".to_string(),
-                data: &self.mygrid_data.prod,
-            },            
-            Series {
-                name: "Production".to_string(),
-                chart_type: "line".to_string(),
-                data: &self.history_data.prod_history,
+            tariffs_buy: Series {
+                name: "Tariffs Buy".to_string(),
+                chart_type: String::new(),
+                data: &self.mygrid_data.tariffs_buy,
             },
-        );
-     
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-
-    /// Returns a combined series of estimated load and load history
-    ///
-    fn get_combined_load(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>) = (
-            Series {
-                name: "Estimated Load".to_string(),
-                chart_type: "area".to_string(),
-                data: &self.mygrid_data.load,
-            },            
-            Series {
-                name: "Load".to_string(),
-                chart_type: "line".to_string(),
-                data: &self.history_data.load_history,
+            prod_diagram: (
+                Series {
+                    name: "Estimated Production".to_string(),
+                    chart_type: "area".to_string(),
+                    data: &self.mygrid_data.prod,
+                },
+                Series {
+                    name: "Production".to_string(),
+                    chart_type: "line".to_string(),
+                    data: &self.history_data.prod_history,
+                },
+            ),
+            load_diagram: (
+                Series {
+                    name: "Estimated Load".to_string(),
+                    chart_type: "area".to_string(),
+                    data: &self.mygrid_data.load,
+                },
+                Series {
+                    name: "Load".to_string(),
+                    chart_type: "line".to_string(),
+                    data: &self.history_data.load_history,
+                },
+            ),
+            cloud_diagram: Series {
+                name: String::new(),
+                chart_type: String::new(),
+                data: &self.mygrid_data.forecast_cloud,
             },
-        );
-
-        Ok(serde_json::to_string_pretty(&series)?)
+            temp_diagram: (
+                Series {
+                    name: "Forecast".to_string(),
+                    chart_type: String::new(),
+                    data: &self.mygrid_data.forecast_temp,
+                },
+                Series {
+                    name: "Actual".to_string(),
+                    chart_type: String::new(),
+                    data: &self.weather_data.temp_history,
+                },
+            ),
+        };
+        Ok(serde_json::to_string_pretty(&reply)?)
     }
 
     /// Returns current schedule
@@ -253,68 +293,6 @@ impl Dispatcher {
     fn get_schedule(&self) -> Result<String, DispatcherError> {
         Ok(serde_json::to_string_pretty(&self.schedule)?)
     }
-
-    /// Returns current whether forecast temperature
-    ///
-    fn get_forecast_temp(&self) -> Result<String, DispatcherError> {
-        let series: (Series<DataItem<f64>>, Series<DataItem<f64>>, f64) = (
-            Series {
-                name: "Forecast".to_string(),
-                chart_type: String::new(),
-                data: &self.mygrid_data.forecast_temp,
-            },
-            Series {
-                name: "Actual".to_string(),
-                chart_type: String::new(),
-                data: &self.weather_data.temp_history,
-            },
-            self.weather_data.temp_current,
-        );
-
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-
-    /// Returns current whether forecast cloud factor
-    ///
-    fn get_forecast_cloud(&self) -> Result<String, DispatcherError> {
-        let series: Series<DataItem<f64>> =
-            Series {
-                name: "Cloud Factor".to_string(),
-                chart_type: String::new(),
-                data: &self.mygrid_data.forecast_cloud,
-            };
-
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-
-    /// Returns the buy tariffs for the day
-    ///
-    fn get_tariffs_buy(&self) -> Result<String, DispatcherError> {
-        let series: Series<DataItem<f64>> = 
-            Series {
-                name: "Tariffs Buy".to_string(),
-                chart_type: String::new(),
-                data: &self.mygrid_data.tariffs_buy,
-            };
-
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-
-    /*
-    /// Returns the current temperature
-    /// 
-    fn get_temperature(&self) -> Result<String, DispatcherError> {
-        let series: Series<DataItem<f64>> =
-            Series {
-                name: "Temperature".to_string(),
-                chart_type: String::new(),
-                data: &vec![self.weather.get_temperature()?],
-            };
-        
-        Ok(serde_json::to_string_pretty(&series)?)
-    }
-    
-     */
     
     /// Updates weather data
     /// 

@@ -17,41 +17,23 @@ function loadScriptSequentially(file) {
 }
 
 function refreshData() {
-    $.getJSON('/policy', function(response) {
+    $.getJSON('/full_dash_data', function(resp) {
         let color = "LimeGreen";
-        if (response.y <= 20) {
+        if (resp.policy <= 20) {
             color = "Red"
-        } else if (response.y > 20 && response.y < 70) {
+        } else if (resp.policy > 20 && resp.policy < 70) {
             color = "Yellow"
         }
+        $("#policy-bar").width(resp.policy + "%").css("background-color", color);
+        $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
 
-        $("#policy-bar").width(response.y + "%").css("background-color", color);
-    });
-
-    $.getJSON('/combined_realtime', function(response) {
-        realtime.updateSeries([response[0]]);
-        soc.updateSeries([response[1]]);
-    });
-
-    $.getJSON('/tariffs_buy', function(response) {
-        tariffs_buy.updateSeries([response])
-    });
-
-    $.getJSON('/combined_production', function(response) {
-        production.updateSeries(response)
-    });
-
-    $.getJSON('/combined_load', function(response) {
-        load.updateSeries(response)
-    });
-
-    $.getJSON('/forecast_cloud', function(response) {
-        cloud.updateSeries([response])
-    });
-
-    $.getJSON('/forecast_temp', function(response) {
-        temp.updateSeries(response.slice(0,2));
-        $("#current-temp").text(Math.round(response[2] * 10) / 10 + " ℃");
+        realtime.updateSeries([resp.current_prod_load]);
+        soc.updateSeries([resp.current_soc_policy]);
+        tariffs_buy.updateSeries([resp.tariffs_buy]);
+        production.updateSeries(resp.prod_diagram);
+        load.updateSeries(resp.load_diagram);
+        cloud.updateSeries([resp.cloud_diagram]);
+        temp.updateSeries(resp.temp_diagram);
     });
 
     let datetime = new Date();
