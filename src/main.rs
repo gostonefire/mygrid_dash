@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
+use chrono::Utc;
 use log::info;
 use rustls::ServerConfig;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
@@ -9,9 +11,10 @@ use rustls_pki_types::pem::PemObject;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::errors::UnrecoverableError;
-use crate::initialization::{config, WebServerParameters};
+use crate::initialization::{config, Google, WebServerParameters};
 use crate::dispatcher::{run, Cmd};
 use crate::handlers::*;
+use crate::manager_tokens::{google_base_data, Tokens};
 
 mod errors;
 mod initialization;
@@ -25,6 +28,10 @@ mod models;
 mod usage_policy;
 mod traits;
 mod manager_weather;
+mod manager_tokens;
+
+type SessionStore = Arc<RwLock<HashMap<String, (i64, String, Option<Tokens>)>>>;
+
 
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
@@ -33,6 +40,8 @@ struct Comms {
 
 struct AppState {
     comms: Arc<Mutex<Comms>>,
+    sessions: SessionStore,
+    config: Arc<Google>,
 }
 
 #[actix_web::main]
@@ -43,18 +52,25 @@ async fn main() -> Result<(), UnrecoverableError> {
     let comms = Arc::new(Mutex::new(Comms{tx_to_mygrid,rx_from_mygrid,}));
     
     // Load configuration
-    let config = config()?;
+    let mut config = config()?;
+    google_base_data(&mut config.google).await.expect("google base data update should succeed");
+    let google_config = Arc::new(config.google.clone());
+    let session_store: SessionStore = Arc::new(RwLock::new(HashMap::new()));
 
+    // Purging of old sessions
+    info!("starting sessions purge job");
+    tokio::spawn(purge_sessions(session_store.clone()));
+    
     // Web server
     info!("starting web server");
     let web_comms = comms.clone();
     let rustls_config = load_rustls_config(&config.web_server)?;
     tokio::spawn(HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(AppState {comms: web_comms.clone()}))
-                .service(small_dash_data)
-                .service(full_dash_data)
-                .service(schedule)
+                .app_data(web::Data::new(AppState {comms: web_comms.clone(), sessions: session_store.clone(), config: google_config.clone() }))
+                .service(login)
+                .service(code)
+                .service(get_data)
                 .service(
                     web::scope("")
                         .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
@@ -104,4 +120,25 @@ fn load_rustls_config(config: &WebServerParameters) -> Result<ServerConfig, Unre
     Ok(ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert_chain, key_der)?)
+}
+
+/// Loop that purges old entries from the session store
+///
+/// # Arguments
+///
+/// * 'session_store' - the session store
+async fn purge_sessions(session_store: SessionStore) {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+        let limit = Utc::now().timestamp() - 86400;
+        {
+            let mut sessions = session_store.write().await;
+            let keys = sessions.keys().map(|k| k.clone()).collect::<Vec<String>>();
+            keys.into_iter().for_each(|k| {
+                if sessions.get(&k).is_some_and(|v| v.0 < limit) {
+                    sessions.remove(&k);
+                }
+            });
+        }
+    }
 }

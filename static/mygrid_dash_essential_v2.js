@@ -17,7 +17,12 @@ function loadScriptSequentially(file) {
 }
 
 function refreshData() {
-    $.getJSON('/small_dash_data', function(resp) {
+    $.getJSON('/data/small', function(resp, textStatus, jqXHR) {
+        const redirectUrl = jqXHR.getResponseHeader('X-Redirect-Location');
+        if (redirectUrl) {
+            window.location.replace(redirectUrl);
+        }
+
         let color = "LimeGreen";
         if (resp.policy <= 20) {
             color = "Red"

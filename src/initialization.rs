@@ -1,7 +1,22 @@
 use std::{env, fs};
+use jsonwebtoken::jwk::JwkSet;
 use serde::Deserialize;
 use crate::errors::ConfigError;
 use crate::logging::setup_logger;
+
+#[derive(Deserialize, Clone)]
+pub struct Google {
+    pub redirect_uri: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub scope: String,
+    pub jwks: Option<JwkSet>,
+    #[serde(default)]
+    pub auth_url: String,
+    #[serde(default)]
+    pub token_url: String,
+    pub well_known: String,
+}
 
 #[derive(Deserialize, Clone)]
 pub struct WebServerParameters {
@@ -36,6 +51,7 @@ pub struct General {
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
+    pub google: Google,
     pub web_server: WebServerParameters,
     pub fox_ess: FoxESS,
     pub mygrid: MyGrid,

@@ -17,7 +17,6 @@ use crate::usage_policy::get_policy;
 pub enum Cmd {
     SmallDashData,
     FullDashData,
-    Schedule,
 }
 
 
@@ -162,7 +161,6 @@ impl Dispatcher {
         let data = match cmd {
             Cmd::SmallDashData       => self.get_small_dash_data()?,
             Cmd::FullDashData        => self.get_full_dash_data()?,
-            Cmd::Schedule            => self.get_schedule()?,
         };
 
         Ok(data)
@@ -288,12 +286,6 @@ impl Dispatcher {
         Ok(serde_json::to_string_pretty(&reply)?)
     }
 
-    /// Returns current schedule
-    ///
-    fn get_schedule(&self) -> Result<String, DispatcherError> {
-        Ok(serde_json::to_string_pretty(&self.schedule)?)
-    }
-    
     /// Updates weather data
     /// 
     async fn update_weather(&mut self) -> Result<(), DispatcherError> {
