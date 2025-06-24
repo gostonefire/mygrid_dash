@@ -21,6 +21,7 @@ function refreshData() {
         const redirectUrl = jqXHR.getResponseHeader('X-Redirect-Location');
         if (redirectUrl) {
             window.location.replace(redirectUrl);
+            return;
         }
 
         let color = "LimeGreen";
