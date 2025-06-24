@@ -2,6 +2,7 @@ use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::header::LOCATION;
 use chrono::Utc;
+use log::info;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::AppState;
@@ -92,19 +93,24 @@ async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Res
             if &state.state_code == sc {
                 return match Tokens::from_code(&data.config, &params.code).await {
                     Ok(token) => {
-                        sessions.insert(state.session.clone(), (Utc::now().timestamp(), String::new(), Some(token)));
+                        info!("{} tries to login", token.email);
+                        if token.is_authorized() {
+                            sessions.insert(state.session.clone(), (Utc::now().timestamp(), String::new(), Some(token)));
 
-                        let cookie = Cookie::build(SESSION_COOKIE, state.session)
-                            .expires(None)
-                            .secure(true)
-                            .http_only(true)
-                            .same_site(SameSite::Lax)
-                            .finish();
+                            let cookie = Cookie::build(SESSION_COOKIE, state.session)
+                                .expires(None)
+                                .secure(true)
+                                .http_only(true)
+                                .same_site(SameSite::Lax)
+                                .finish();
 
-                        HttpResponse::SeeOther()
-                            .cookie(cookie)
-                            .append_header((LOCATION, state.context))
-                            .finish()
+                            HttpResponse::SeeOther()
+                                .cookie(cookie)
+                                .append_header((LOCATION, state.context))
+                                .finish()
+                        } else {
+                            HttpResponse::Unauthorized().finish()
+                        }
                     }
                     Err(_) => { HttpResponse::InternalServerError().finish() }
                 }

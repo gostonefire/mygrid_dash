@@ -21,6 +21,7 @@ pub struct Tokens {
     pub access_token: String,
     pub expires_at: DateTime<Utc>,
     pub email: String,
+    pub authorized: bool,
 }
 
 impl Tokens {
@@ -49,11 +50,13 @@ impl Tokens {
 
         let json = resp.text().await?;
         let import: TokensResponse = serde_json::from_str(&json)?;
-
+        let email = validate_jwt(config, &import.id_token)?;
+        
         let tokens = Tokens {
             access_token: import.access_token,
             expires_at: Utc::now().add(TimeDelta::seconds(import.expires_in)),
-            email: validate_jwt(config, &import.id_token)? ,
+            authorized: config.users.contains(&email),
+            email,
         };
 
         Ok(tokens)
@@ -64,6 +67,11 @@ impl Tokens {
     pub fn is_expired(&self) -> bool {
         self.expires_at < Utc::now()
     }
+    
+    /// Checks if the authenticated user is authorized to use the application
+    /// 
+    pub fn is_authorized(&self) -> bool { self.authorized }
+    
 }
 
 /// Validates the given JWT ID Token and returns the email claim

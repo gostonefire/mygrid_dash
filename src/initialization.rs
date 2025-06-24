@@ -16,6 +16,7 @@ pub struct Google {
     #[serde(default)]
     pub token_url: String,
     pub well_known: String,
+    pub users: Vec<String>,
 }
 
 #[derive(Deserialize, Clone)]
