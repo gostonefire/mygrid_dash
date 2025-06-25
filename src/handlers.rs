@@ -109,7 +109,9 @@ async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Res
                                 .append_header((LOCATION, state.context))
                                 .finish()
                         } else {
-                            HttpResponse::Unauthorized().finish()
+                            HttpResponse::SeeOther()
+                                .append_header((LOCATION, "/unauthorized.html"))
+                                .finish()
                         }
                     }
                     Err(_) => { HttpResponse::InternalServerError().finish() }
@@ -119,5 +121,7 @@ async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Res
         }
     }
 
-    HttpResponse::Unauthorized().finish()
+    HttpResponse::SeeOther()
+        .append_header((LOCATION, "/unauthorized.html"))
+        .finish()
 }
