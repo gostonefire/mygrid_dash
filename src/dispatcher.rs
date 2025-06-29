@@ -111,7 +111,7 @@ impl Dispatcher {
     /// * 'config' - configuration struct
     async fn new(config: &Config) -> Result<Self, DispatcherError> {
         let fox_cloud = Fox::new(&config.fox_ess)?;
-        let weather = Weather::new(&config.weather.host)?;
+        let weather = Weather::new(&config.weather.host, &config.weather.sensor)?;
         
         Ok(Self {
             schedule: Vec::new(),

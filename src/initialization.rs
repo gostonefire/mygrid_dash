@@ -42,6 +42,7 @@ pub struct MyGrid {
 #[derive(Deserialize, Clone)]
 pub struct Weather {
     pub host: String,
+    pub sensor: String,
 }
 
 #[derive(Deserialize, Clone)]

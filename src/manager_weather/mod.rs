@@ -14,18 +14,23 @@ use crate::models::DataItem;
 pub struct Weather {
     client: Client,
     host: String,
+    sensor: String,
 }
 
 impl Weather {
 
     /// Returns a new instance of Weather
     /// 
-    pub fn new(host: &str) -> Result<Self, WeatherError> {
+    /// # Arguments
+    /// 
+    /// * 'host' - host running the weather logger service
+    /// * 'sensor' - name of sensor to get weather data for
+    pub fn new(host: &str, sensor: &str) -> Result<Self, WeatherError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()?;
         
-        Ok(Self { client, host: host.to_string() })
+        Ok(Self { client, host: host.to_string(), sensor: sensor.to_string() })
     }
     
     /// Returns the temperature history from within the given time boundaries (inclusive)
@@ -39,7 +44,7 @@ impl Weather {
         let url = format!("http://{}/temperature", self.host);
         
         let req = self.client.get(&url)
-            .query(&[("from", &from.to_rfc3339()), ("to", &to.to_rfc3339())])
+            .query(&[("id", &self.sensor), ("from", &from.to_rfc3339()), ("to", &to.to_rfc3339())])
             .send().await?;
 
         let status = req.status();
