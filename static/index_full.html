@@ -67,7 +67,11 @@
             flex-flow: column;
             margin: 10px;
         }
-
+        .minmax {
+            margin-bottom: 8px;
+            margin-top: 8px;
+            color: whitesmoke;
+        }
         #realtime-box, #tariffs-buy, #mygrid, #forecast {
             max-width: 800px;
             flex-basis: 100%;
@@ -97,13 +101,17 @@
 <div class="flex-column">
     <div class="flex-row" id="header">
         <h1 id="current-temp">-- ℃</h1>
+        <div>
+            <p class="minmax" id="minmax-today">Today: -- / -- ℃</p>
+            <p class="minmax" id="minmax-yesterday">Yesterday: -- / -- ℃</p>
+        </div>
         <div class="flex-row" id="policy-block">
             <h3>Policy:</h3>
             <div id="policy-bar-block">
                 <div id="policy-bar"></div>
             </div>
         </div>
-        <button type="button" id="pane-shift" onclick="window.location.replace('/full');">Small</button>
+        <button type="button" id="pane-shift" onclick="window.location.replace('/');">Small</button>
     </div>
     <div class="flex-charts">
         <div class="flex-row" id="realtime-box">
@@ -123,7 +131,7 @@
 </div>
 
 
-<script src="./mygrid_dash_v2.js?v=2.2.0"></script>
+<script src="./mygrid_dash_v2.js?v=2.3.0"></script>
 
 </body>
 </html>

@@ -32,7 +32,9 @@ function refreshData() {
         }
         $("#policy-bar").width(resp.policy + "%").css("background-color", color);
         $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
-
+        $("#minmax-today").text("Today: " + resp.today_max + " / " + resp.today_min + " ℃");
+        $("#minmax-yesterday").text("Yesterday: " + resp.yesterday_max + " / " + resp.yesterday_min + " ℃");
+        
         realtime.updateSeries([resp.current_prod_load]);
         soc.updateSeries([resp.current_soc_policy]);
         tariffs_buy.updateSeries([resp.tariffs_buy]);

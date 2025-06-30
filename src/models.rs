@@ -26,8 +26,16 @@ pub struct Series<'a, T> {
     pub data: &'a Vec<T>,
 }
 
+pub struct MinMax {
+    pub yesterday_min: f64,
+    pub yesterday_max: f64,
+    pub today_min: f64,
+    pub today_max: f64,
+}
+
 pub struct WeatherData {
     pub temp_history: Vec<DataItem<f64>>,
+    pub min_max: MinMax,
     pub temp_current: f64,
     pub last_end_time: DateTime<Utc>,
 }

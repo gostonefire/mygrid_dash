@@ -11,7 +11,7 @@ use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
 use crate::manager_weather::Weather;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, WeatherData};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, MinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -144,6 +144,12 @@ impl Dispatcher {
             },
             weather_data: WeatherData {
                 temp_history: Vec::new(),
+                min_max: MinMax {
+                    yesterday_min: 0.0,
+                    yesterday_max: 0.0,
+                    today_min: 0.0,
+                    today_max: 0.0,
+                },
                 temp_current: 0.0,
                 last_end_time: Default::default(),
             },
@@ -173,6 +179,10 @@ impl Dispatcher {
         struct SmallDashData<'a> {
             policy: u8,
             temp_current: f64,
+            yesterday_min: f64,
+            yesterday_max: f64,
+            today_min: f64,
+            today_max: f64,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
         }
@@ -180,6 +190,10 @@ impl Dispatcher {
         let reply = SmallDashData {
             policy: self.usage_policy,
             temp_current: self.weather_data.temp_current,
+            yesterday_min: self.weather_data.min_max.yesterday_min,
+            yesterday_max: self.weather_data.min_max.yesterday_max,
+            today_min: self.weather_data.min_max.today_min,
+            today_max: self.weather_data.min_max.today_max,
             temp_diagram: (
                 Series {
                     name: "Forecast".to_string(),
@@ -208,6 +222,10 @@ impl Dispatcher {
         struct FullDashData<'a> {
             policy: u8,
             temp_current: f64,
+            yesterday_min: f64,
+            yesterday_max: f64,
+            today_min: f64,
+            today_max: f64,
             current_prod_load: Series<'a, DataPoint<f64>>,
             current_soc_policy: Series<'a, DataPoint<u8>>,
             tariffs_buy: Series<'a, DataItem<f64>>,
@@ -220,6 +238,10 @@ impl Dispatcher {
         let reply = FullDashData {
             policy: self.usage_policy,
             temp_current: self.weather_data.temp_current,
+            yesterday_min: self.weather_data.min_max.yesterday_min,
+            yesterday_max: self.weather_data.min_max.yesterday_max,
+            today_min: self.weather_data.min_max.today_min,
+            today_max: self.weather_data.min_max.today_max,
             current_prod_load: Series {
                 name: String::new(),
                 chart_type: String::new(),
@@ -308,6 +330,8 @@ impl Dispatcher {
         if last != 0 {
             self.weather_data.temp_current = self.weather_data.temp_history[last - 1].y;
         }
+        
+        self.weather_data.min_max = self.weather.get_min_max().await?;
         
         self.weather_data.last_end_time = utc_now;
         

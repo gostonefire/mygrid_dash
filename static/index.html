@@ -20,6 +20,11 @@
             justify-content: space-between;
             align-items: center;
         }
+        .minmax {
+            margin-bottom: 8px;
+            margin-top: 8px;
+            color: whitesmoke;
+        }
         #forecast {
             max-width: 800px;
             flex-basis: 100%;
@@ -79,6 +84,10 @@
     <div class="flex-column" id="forecast">
         <div class="flex-row" id="header">
             <h1 id="current-temp">-- ℃</h1>
+            <div>
+                <p class="minmax" id="minmax-today">Today: -- / -- ℃</p>
+                <p class="minmax" id="minmax-yesterday">Yesterday: -- / -- ℃</p>
+            </div>
             <div class="flex-row" id="policy-block">
                 <h3>Policy:</h3>
                 <div id="policy-bar-block">
@@ -92,7 +101,7 @@
     </div>
 
 
-<script src="./mygrid_dash_essential_v2.js?v=2.2.0"></script>
+<script src="./mygrid_dash_essential_v2.js?v=2.3.0"></script>
 
 </body>
 </html>

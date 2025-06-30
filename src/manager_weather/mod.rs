@@ -5,8 +5,8 @@ use std::time::Duration;
 use chrono::{DateTime, Local};
 use reqwest::Client;
 use crate::manager_weather::errors::WeatherError;
-use crate::manager_weather::models::WeatherItem;
-use crate::models::DataItem;
+use crate::manager_weather::models::{TwoDaysMinMax, WeatherItem};
+use crate::models::{DataItem, MinMax};
 
 
 /// Weather manager
@@ -57,6 +57,32 @@ impl Weather {
         let from_date = if ensure_from {Some(from)} else {None};
         
         Ok(transform_history(weather_res, from_date, to))
+    }
+
+    
+    /// Returns today's and yesterday's min/max temperatures
+    /// 
+    pub async fn get_min_max(&self) -> Result<MinMax, WeatherError> {
+        let url = format!("http://{}/minmax", self.host);
+
+        let req = self.client.get(&url)
+            .query(&[("id", &self.sensor)])
+            .send().await?;
+
+        let status = req.status();
+        if !status.is_success() {
+            return Err(WeatherError(format!("{:?}", status)));
+        }
+
+        let json = req.text().await?;
+        let minmax: TwoDaysMinMax<f64> = serde_json::from_str(&json)?;
+       
+        Ok(MinMax {
+            yesterday_min: minmax.yesterday_min,
+            yesterday_max: minmax.yesterday_max,
+            today_min: minmax.today_min,
+            today_max: minmax.today_max,
+        })
     }
 }
 
