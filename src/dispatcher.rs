@@ -356,7 +356,7 @@ impl Dispatcher {
         let mut last_end_time: DateTime<Utc> = utc_now;
         
         let mut start = local_now.duration_trunc(TimeDelta::days(1))?.with_timezone(&Utc);
-        if self.history_data.last_end_time.ordinal0() == utc_now.ordinal0() {
+        if self.history_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() {
             start = self.history_data.last_end_time.add(TimeDelta::seconds(1));
             last_end_time = self.history_data.last_end_time;
         } else {
