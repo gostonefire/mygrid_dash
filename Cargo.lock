@@ -1477,7 +1477,7 @@ dependencies = [
 
 [[package]]
 name = "mygrid_dash"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "actix-files",
  "actix-web",
