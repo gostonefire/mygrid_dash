@@ -1,0 +1,16 @@
+[Unit]
+Description=Dash for MyGrid
+After=network-online.target
+
+[Service]
+ExecStart=/bin/bash /home/petste/MyGridDash/start.sh
+WorkingDirectory=/home/petste/MyGridDash/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=30
+User=root
+
+[Install]
+WantedBy=multi-user.target
+
