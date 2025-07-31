@@ -19,7 +19,10 @@ pub mod errors;
 pub async fn get_schedule(schedule_path: &str) -> Result<Vec<Block>, MyGridError> {
     let json = tokio::fs::read_to_string(schedule_path).await?;
     
-    let blocks: Vec<Block> = serde_json::from_str(&json)?;
+    let mut blocks: Vec<Block> = serde_json::from_str(&json)?;
+
+    blocks.iter_mut().for_each(|block| {set_start_length(block);});
+
     Ok(blocks)
 }
 
@@ -139,4 +142,18 @@ fn move_filter_pad<T: MyGrid<Item = T>>(mut source: HashMap<DateTime<Utc>, T>, t
 /// * 'w' - input in watts
 fn to_kw(w: f64) -> f64 {
     (w / 10.0).round() / 100.0
+}
+
+/// Sets the start and length fields of a block with correct data
+///
+/// # Arguments
+///
+/// * 'block' - the block to update
+fn set_start_length(block: &mut Block) {
+    let delta = block.end_time - block.start_time;
+    let hours = delta.num_hours();
+    let minutes = delta.num_minutes() - hours * 60;
+
+    block.start = block.start_time.format("%H:%M").to_string();
+    block.length = format!("{:02}:{:02}", hours + 1, minutes); // Need to add one hour since end_time is inclusive
 }

@@ -52,11 +52,17 @@ pub enum BlockType {
 #[derive(Serialize, Deserialize)]
 pub struct Block {
     pub block_type: BlockType,
+    #[serde(skip_serializing)]
     pub start_time: DateTime<Local>,
+    #[serde(skip_serializing)]
     pub end_time: DateTime<Local>,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: String,
+    #[serde(default)]
+    pub start: String,
+    #[serde(default)]
+    pub length: String,
 }
 
 

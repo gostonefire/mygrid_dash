@@ -185,6 +185,7 @@ impl Dispatcher {
             today_max: f64,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
+            schedule: &'a Vec<Block>,
         }
         
         let reply = SmallDashData {
@@ -210,7 +211,8 @@ impl Dispatcher {
                 name: "Tariffs Buy".to_string(),
                 chart_type: String::new(),
                 data: &self.mygrid_data.tariffs_buy,
-            }
+            },
+            schedule: &self.schedule,
         };
         Ok(serde_json::to_string_pretty(&reply)?)
     }

@@ -37,6 +37,17 @@ function refreshData() {
 
         temp.updateSeries(resp.temp_diagram);
         tariffs_buy.updateSeries([resp.tariffs_buy]);
+
+        $('#schedule-body').empty();
+        for (let i = 0; i < resp.schedule.length; i++) {
+            let row = resp.schedule[i];
+
+
+
+            $('#schedule-body').append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
+                row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
+                row.status + '</td></tr>');
+        }
     });
     
     let datetime = new Date();

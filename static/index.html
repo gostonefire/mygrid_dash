@@ -70,9 +70,16 @@
             cursor: pointer;
 
         }
-        #tariffs-buy, #temperature {
+        #tariffs-buy, #temperature, #schedule {
             max-width: 800px;
             flex-basis: 100%;
+        }
+        table, th, td {
+            border-bottom:  1px solid grey;
+            border-collapse: collapse;
+            background-color: #343a3f;
+            color:  white;
+            text-align: left;
         }
     </style>
 
@@ -98,10 +105,31 @@
         </div>
         <div id="temperature"></div>
         <div id="tariffs-buy"></div>
+        <table id="schedule">
+            <caption style="padding-bottom: 5px"><b>Schedule</b></caption>
+            <tr>
+                <td>Block</td>
+                <td>Start</td>
+                <td>Length</td>
+                <td>SoC In</td>
+                <td>SoC Out</td>
+                <td>Status</td>
+            </tr>
+            <tbody id="schedule-body">
+                <tr>
+                    <td>--</td>
+                    <td>--</td>
+                    <td>--</td>
+                    <td>--</td>
+                    <td>--</td>
+                    <td>--</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
 
-<script src="./mygrid_dash_essential_v2.js?v=2.3.2"></script>
+<script src="./mygrid_dash_essential_v2.js?v=2.3.3"></script>
 
 </body>
 </html>
