@@ -57,6 +57,9 @@ async fn main() -> Result<(), UnrecoverableError> {
     let google_config = Arc::new(config.google.clone());
     let session_store: SessionStore = Arc::new(RwLock::new(HashMap::new()));
 
+    // Print version
+    info!("mygrid_dash version: {}", env!("CARGO_PKG_VERSION"));
+    
     // Purging of old sessions
     info!("starting sessions purge job");
     tokio::spawn(purge_sessions(session_store.clone()));

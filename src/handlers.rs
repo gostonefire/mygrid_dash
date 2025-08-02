@@ -2,7 +2,7 @@ use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::header::LOCATION;
 use chrono::Utc;
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::AppState;
@@ -80,7 +80,10 @@ async fn login(data: web::Data<AppState>, context: web::Query<Context>) -> impl 
                 .append_header((LOCATION, url))
                 .finish()
         }
-        Err(_) => { HttpResponse::InternalServerError().finish() }
+        Err(e) => {
+            error!("error in /login: {}", e);
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }
 
@@ -114,7 +117,10 @@ async fn code(data: web::Data<AppState>, params: web::Query<Params>) -> impl Res
                                 .finish()
                         }
                     }
-                    Err(_) => { HttpResponse::InternalServerError().finish() }
+                    Err(e) => {
+                        error!("error in /code: {}", e);
+                        HttpResponse::InternalServerError().finish()
+                    }
                 }
 
             }
