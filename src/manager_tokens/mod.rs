@@ -1,11 +1,14 @@
 mod errors;
 
 use std::ops::Add;
+use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use jsonwebtoken::jwk::{AlgorithmParameters, JwkSet};
-use reqwest::Url;
+use log::info;
+use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use crate::initialization::Google;
 use crate::manager_tokens::errors::TokenError;
 
@@ -29,9 +32,10 @@ impl Tokens {
     ///
     /// # Arguments
     ///
-    /// * 'config' - configuration struct for Google
+    /// * 'google_config' - configuration struct for Google
     /// * 'code' - code from an initiated OAuth2.0 code flow
-    pub async fn from_code(config: &Google, code: &str) -> Result<Self, TokenError> {
+    pub async fn from_code(google_config: &Arc<RwLock<Google>>, code: &str) -> Result<Self, TokenError> {
+        let config = google_config.read().await;
         let body: [(&str, &str); 5] = [
             ("code", code),
             ("client_id", &config.client_id),
@@ -50,7 +54,7 @@ impl Tokens {
 
         let json = resp.text().await?;
         let import: TokensResponse = serde_json::from_str(&json)?;
-        let email = validate_jwt(config, &import.id_token)?;
+        let email = validate_jwt(&*config, &import.id_token)?;
         
         let tokens = Tokens {
             access_token: import.access_token,
@@ -117,34 +121,58 @@ fn validate_jwt(config: &Google, jwt: &str) -> Result<String, TokenError> {
 ///
 /// # Arguments
 ///
-/// * 'config' - config to update
-pub async fn google_base_data(config: &mut Google) -> Result<(), TokenError> {
-    #[derive(Deserialize)]
-    struct Knowns {
-        authorization_endpoint: String,
-        token_endpoint: String,
-        jwks_uri: String,
+/// * 'google_config' - config to update
+pub async fn google_base_data(google_config: Arc<RwLock<Google>>) -> Result<(), TokenError> {
+    let utc_timestamp = Utc::now().timestamp();
+
+    if utc_timestamp >= google_config.read().await.well_known_expire {
+        info!("updating well known google urls");
+        let mut config = google_config.write().await;
+        
+        #[derive(Deserialize)]
+        struct Knowns {
+            authorization_endpoint: String,
+            token_endpoint: String,
+            jwks_uri: String,
+        }
+        let resp = reqwest::get(&config.well_known).await?;
+        let max_age = get_max_age(&resp)?;
+
+        let json = resp.text().await?;
+        let knowns: Knowns = serde_json::from_str(&json)?;
+
+        config.jwks_uri = knowns.jwks_uri;
+        config.auth_url = knowns.authorization_endpoint;
+        config.token_url = knowns.token_endpoint;
+        config.well_known_expire = utc_timestamp + max_age;
     }
-    let resp = reqwest::get(&config.well_known).await?;
 
-    let json = resp.text().await?;
-    let knowns: Knowns = serde_json::from_str(&json)?;
+    if utc_timestamp >= google_config.read().await.jwks_expire {
+        info!("updating google jwks");
+        let mut config = google_config.write().await;
+        
+        let resp = reqwest::get(&config.jwks_uri).await?;
+        let max_age = get_max_age(&resp)?;
+        
+        let json = resp.text().await?;
 
-    let resp = reqwest::get(&knowns.jwks_uri).await?;
-    let json = resp.text().await?;
+        let jwks: JwkSet = serde_json::from_str(&json)?;
 
-    let jwks: JwkSet = serde_json::from_str(&json)?;
-
-    config.jwks = Some(jwks);
-    config.auth_url = knowns.authorization_endpoint;
-    config.token_url = knowns.token_endpoint;
+        config.jwks = Some(jwks);
+        config.jwks_expire = utc_timestamp + max_age;
+    }
 
     Ok(())
 }
 
 /// Builds an access request url and returns a url encoded version of it
 ///
-pub fn build_access_request_url(config: &Google, state: &str) -> String {
+/// # Arguments
+///
+/// * 'google_config' - configuration struct for Google
+/// * 'state' - state
+pub async fn build_access_request_url(google_config: &Arc<RwLock<Google>>, state: &str) -> String {
+    let config = google_config.read().await;
     let params: [(&str, &str); 5] = [
         ("response_type", "code"),
         ("client_id", &config.client_id),
@@ -155,4 +183,23 @@ pub fn build_access_request_url(config: &Google, state: &str) -> String {
 
     let url = Url::parse_with_params(&config.auth_url, &params).unwrap();
     url.to_string()
+}
+
+/// Returns the cache control max-age value in seconds
+/// 
+/// # Arguments
+/// 
+/// * 'response' - the response objects from a request
+fn get_max_age(response: &Response) -> Result<i64, TokenError> {
+    let cache_control = response.headers().get("cache-control")
+        .ok_or("no cache control header")?;
+    let cache_value = cache_control.to_str()
+        .map_err(|_| "invalid cache-control header")?;
+
+    let s = cache_value.split(',').map(|s| s.trim()).collect::<Vec<&str>>();
+    let s = s.into_iter().find(|s| s.starts_with("max-age")).ok_or("no max-age")?;
+    let v = s.split('=').map(|s| s.trim()).last().ok_or("invalid max-age")?;
+    let age = v.parse::<i64>().map_err(|_| "max-age not a number")? * 60;
+    
+    Ok(age)
 }

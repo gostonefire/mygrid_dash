@@ -36,3 +36,6 @@ impl From<reqwest::Error> for TokenError {
 impl From<jsonwebtoken::errors::Error> for TokenError {
     fn from(_: jsonwebtoken::errors::Error) -> Self { TokenError::InvalidJwt }
 }
+impl From<&str> for TokenError {
+    fn from(e: &str) -> Self { TokenError::Request(e.to_string()) }
+}

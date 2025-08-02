@@ -74,7 +74,7 @@ async fn login(data: web::Data<AppState>, context: web::Query<Context>) -> impl 
         Ok(state) => {
             data.sessions.write().await.insert(session, (Utc::now().timestamp(), state_code, None));
 
-            let url = build_access_request_url(&data.config, &state);
+            let url = build_access_request_url(&data.config, &state).await;
 
             HttpResponse::TemporaryRedirect()
                 .append_header((LOCATION, url))

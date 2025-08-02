@@ -11,12 +11,18 @@ pub struct Google {
     pub client_id: String,
     pub client_secret: String,
     pub scope: String,
+    #[serde(default)]
+    pub jwks_uri: String,
     pub jwks: Option<JwkSet>,
+    #[serde(default)]
+    pub jwks_expire: i64,
     #[serde(default)]
     pub auth_url: String,
     #[serde(default)]
     pub token_url: String,
     pub well_known: String,
+    #[serde(default)]
+    pub well_known_expire: i64,
     pub users: Vec<String>,
 }
 

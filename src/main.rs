@@ -4,7 +4,7 @@ use tokio::sync::{Mutex, RwLock};
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
 use chrono::Utc;
-use log::info;
+use log::{error, info};
 use rustls::ServerConfig;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use rustls_pki_types::pem::PemObject;
@@ -41,7 +41,7 @@ struct Comms {
 struct AppState {
     comms: Arc<Mutex<Comms>>,
     sessions: SessionStore,
-    config: Arc<Google>,
+    config: Arc<RwLock<Google>>,
 }
 
 #[actix_web::main]
@@ -52,18 +52,24 @@ async fn main() -> Result<(), UnrecoverableError> {
     let comms = Arc::new(Mutex::new(Comms{tx_to_mygrid,rx_from_mygrid,}));
     
     // Load configuration
-    let mut config = config()?;
-    google_base_data(&mut config.google).await.expect("google base data update should succeed");
-    let google_config = Arc::new(config.google.clone());
+    let config = config()?;
+    let google_config = Arc::new(RwLock::new(config.google.clone()));
     let session_store: SessionStore = Arc::new(RwLock::new(HashMap::new()));
 
     // Print version
     info!("mygrid_dash version: {}", env!("CARGO_PKG_VERSION"));
-    
+
+    // Enrich config
+    google_base_data(google_config.clone()).await.expect("google base data update should succeed");
+
     // Purging of old sessions
     info!("starting sessions purge job");
     tokio::spawn(purge_sessions(session_store.clone()));
-    
+
+    // Purging of old sessions
+    info!("starting google base data update job");
+    tokio::spawn(update_google_base_data(google_config.clone()));
+
     // Web server
     info!("starting web server");
     let web_comms = comms.clone();
@@ -142,6 +148,20 @@ async fn purge_sessions(session_store: SessionStore) {
                     sessions.remove(&k);
                 }
             });
+        }
+    }
+}
+
+/// Periodically updates google base data such as well known urls and jwks
+///
+/// # Arguments
+///
+/// * 'google_config' - google configuration data
+async fn update_google_base_data(google_config: Arc<RwLock<Google>>) {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        if let Err(e) = google_base_data(google_config.clone()).await {
+            error!("error in google_base_data: {}", e);
         }
     }
 }
