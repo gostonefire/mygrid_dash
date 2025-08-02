@@ -191,15 +191,24 @@ pub async fn build_access_request_url(google_config: &Arc<RwLock<Google>>, state
 /// 
 /// * 'response' - the response objects from a request
 fn get_max_age(response: &Response) -> Result<i64, TokenError> {
-    let cache_control = response.headers().get("cache-control")
-        .ok_or("no cache control header")?;
-    let cache_value = cache_control.to_str()
+    // First get the max-age value
+    let cache_control_header = response.headers().get("Cache-Control")
+        .ok_or("no cache-control header")?;
+    let cache_value = cache_control_header.to_str()
         .map_err(|_| "invalid cache-control header")?;
 
     let s = cache_value.split(',').map(|s| s.trim()).collect::<Vec<&str>>();
     let s = s.into_iter().find(|s| s.starts_with("max-age")).ok_or("no max-age")?;
     let v = s.split('=').map(|s| s.trim()).last().ok_or("invalid max-age")?;
-    let age = v.parse::<i64>().map_err(|_| "max-age not a number")? * 60;
-    
-    Ok(age)
+    let max_age = v.parse::<i64>().map_err(|_| "max-age not a number")?;
+
+    // Then get the age value if present
+    let age_header = response.headers().get("Age");
+    let age = if let Some(age_header) = age_header {
+        age_header.to_str().map_err(|_| "invalid age")?.parse::<i64>().map_err(|_| "age not a number")?
+    } else {
+        0
+    };
+
+    Ok(max_age - age)
 }
