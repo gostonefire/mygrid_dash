@@ -74,6 +74,18 @@
             max-width: 800px;
             flex-basis: 100%;
         }
+        #dim_screen
+        {
+            position:fixed;
+            padding:0;
+            margin:0;
+            top:0;
+            left:0;
+            width: 100%;
+            height: 100%;
+            background:rgba(0,0,0,1.0);
+            display:none;
+        }
         table, th, td {
             border-bottom:  1px solid grey;
             border-collapse: collapse;
@@ -127,9 +139,9 @@
             </tbody>
         </table>
     </div>
+    <div id="dim_screen" onclick="undimScreen()"></div>
 
-
-<script src="./mygrid_dash_essential_v2.js?v=2.3.7"></script>
+<script src="./mygrid_dash_essential_v2.js?v=2.3.8"></script>
 
 </body>
 </html>

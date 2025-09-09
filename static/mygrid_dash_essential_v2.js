@@ -1,3 +1,7 @@
+const six = 360;
+const twenty_two = 840; // 1320;
+let timer = 0;
+
 function loadScriptSequentially(file) {
     return new Promise((resolve, reject) => {
         const newScript = document.createElement('script');
@@ -16,7 +20,17 @@ function loadScriptSequentially(file) {
     });
 }
 
-function refreshData() {
+function refreshData(forceRefresh) {
+    const date_now = new Date();
+    const now = date_now.getHours() * 60 + date_now.getMinutes();
+
+    const dim_screen = $("#dim_screen");
+    if ((now >= twenty_two || now < six) && !forceRefresh) {
+        dim_screen.show();
+        return;
+    }
+    dim_screen.hide();
+
     $.getJSON('/data/small', function(resp, textStatus, jqXHR) {
         const redirectUrl = jqXHR.getResponseHeader('X-Redirect-Location');
         if (redirectUrl) {
@@ -38,13 +52,13 @@ function refreshData() {
         temp.updateSeries(resp.temp_diagram);
         tariffs_buy.updateSeries([resp.tariffs_buy]);
 
-        $('#schedule-body').empty();
+        let schedule_body = $('#schedule-body');
+
+        schedule_body.empty();
         for (let i = 0; i < resp.schedule.length; i++) {
             let row = resp.schedule[i];
 
-
-
-            $('#schedule-body').append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
+            schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
                 row.status + '</td></tr>');
         }
@@ -75,13 +89,26 @@ function refreshData() {
     });
 }
 
+function undimScreen() {
+    clearInterval(timer);
+
+    $("#dim_screen").hide();
+    refreshData(true);
+    setTimeout(() => {
+        $("#dim_screen").show();
+        timer = setInterval(() => {
+            refreshData(false);
+        }, 60000);
+    }, 60000);
+}
+
 loadScriptSequentially('locale_se.js')
     .then(() => loadScriptSequentially('mygrid_temp.js'))
     .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
     .then(() => {
-        refreshData();
-        setInterval(() => {
-            refreshData();
+        refreshData(true);
+        timer = setInterval(() => {
+            refreshData(false);
         }, 60000);
     })
     .catch(error => displayMessage(error.message, 'error'));
