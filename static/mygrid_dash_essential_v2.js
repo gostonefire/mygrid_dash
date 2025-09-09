@@ -1,5 +1,5 @@
 const six = 360;
-const twenty_two = 840; // 1320;
+const twenty_two = 1320; // 1320;
 let timer = 0;
 
 function loadScriptSequentially(file) {
