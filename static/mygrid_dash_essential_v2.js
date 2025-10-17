@@ -60,7 +60,7 @@ function refreshData(forceRefresh) {
 
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
-                row.status + '</td></tr>');
+                row.cost + '</td><td>' + row.status + '</td></tr>');
         }
     });
     

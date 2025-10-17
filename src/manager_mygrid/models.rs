@@ -77,6 +77,7 @@ pub struct SourceBlock {
     pub block_type: BlockType,
     pub start_time: DateTime<Local>,
     pub end_time: DateTime<Local>,
+    pub cost: f64,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: Status,
@@ -87,6 +88,7 @@ pub struct Block {
     pub block_type: BlockType,
     #[serde(skip_serializing)]
     pub start_time: DateTime<Local>,
+    pub cost: String,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: String,

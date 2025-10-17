@@ -157,6 +157,7 @@ fn transform_source_block(block: &SourceBlock) -> Block {
     Block {
         block_type: block.block_type.clone(),
         start_time: block.start_time,
+        cost: format!("{:05.2}", block.cost),
         soc_in: block.soc_in,
         soc_out: block.soc_out,
         status: block.status.to_string(),
