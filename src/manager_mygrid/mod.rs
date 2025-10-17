@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use glob::glob;
 use crate::manager_mygrid::errors::MyGridError;
-use crate::manager_mygrid::models::{BaseData, Block};
+use crate::manager_mygrid::models::{BaseData, Block, SourceBlock};
 use crate::models::{DataItem, MygridData};
 use crate::traits::MyGrid;
 
@@ -19,9 +19,9 @@ pub mod errors;
 pub async fn get_schedule(schedule_path: &str) -> Result<Vec<Block>, MyGridError> {
     let json = tokio::fs::read_to_string(schedule_path).await?;
     
-    let mut blocks: Vec<Block> = serde_json::from_str(&json)?;
+    let source_blocks: Vec<SourceBlock> = serde_json::from_str(&json)?;
 
-    blocks.iter_mut().for_each(|block| {set_start_length(block);});
+    let blocks: Vec<Block> = source_blocks.iter().map(|b| transform_source_block(b)).collect();
 
     Ok(blocks)
 }
@@ -144,16 +144,23 @@ fn to_kw(w: f64) -> f64 {
     (w / 10.0).round() / 100.0
 }
 
-/// Sets the start and length fields of a block with correct data
+/// Transforms the Block as given from MyGrid, i.e. the SourceBlock the dash representation of a Block
 ///
 /// # Arguments
 ///
-/// * 'block' - the block to update
-fn set_start_length(block: &mut Block) {
+/// * 'block' - input block of type SourceBlock
+fn transform_source_block(block: &SourceBlock) -> Block {
     let delta = block.end_time - block.start_time;
     let hours = delta.num_hours();
     let minutes = delta.num_minutes() - hours * 60;
 
-    block.start = block.start_time.format("%H:%M").to_string();
-    block.length = format!("{:02}:{:02}", hours + 1, minutes); // Need to add one hour since end_time is inclusive
+    Block {
+        block_type: block.block_type.clone(),
+        start_time: block.start_time,
+        soc_in: block.soc_in,
+        soc_out: block.soc_out,
+        status: block.status.to_string(),
+        start: block.start_time.format("%H:%M").to_string(),
+        length: format!("{:02}:{:02}", hours + 1, minutes), // Need to add one hour since end_time is inclusive,
+    }
 }
