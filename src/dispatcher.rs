@@ -449,7 +449,7 @@ impl Dispatcher {
             load: self.real_time_data.load,
             soc: self.real_time_data.soc,
             policy_tariffs: &self.mygrid_data.policy_tariffs,
-            date_time: Local::now().duration_trunc(TimeDelta::hours(1))?,
+            date_time: Local::now().duration_trunc(TimeDelta::minutes(15))?,
         };
         
         self.usage_policy = get_policy(data) * 10;
