@@ -62,14 +62,14 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
             forecast_cloud.insert(datetime, DataItem { x: d.date_time, y: 1.0 - d.cloud_factor });
         }
 
-        for d in base_data.production_kw {
+        for d in base_data.production {
             let datetime = d.date_time.with_timezone(&Utc);
-            production.insert(datetime, DataItem { x: d.date_time, y: to_kw(d.power) });
+            production.insert(datetime, DataItem { x: d.date_time, y: to_kw(d.data, 12) });
         }
 
         for d in base_data.consumption {
             let datetime = d.date_time.with_timezone(&Utc);
-            consumption.insert(datetime, DataItem { x: d.date_time, y: to_kw(d.power) });
+            consumption.insert(datetime, DataItem { x: d.date_time, y: to_kw(d.data, 12) });
         }
 
         for d in base_data.tariffs {
@@ -135,13 +135,14 @@ fn move_filter_pad<T: MyGrid<Item = T>>(mut source: HashMap<DateTime<Utc>, T>, t
 }
 
 
-/// Converts and rounds from watts to kilowatts
+/// Converts and rounds from watts to kWh
 /// 
 /// # Arguments
 /// 
 /// * 'w' - input in watts
-fn to_kw(w: f64) -> f64 {
-    (w / 10.0).round() / 100.0
+/// * 'units_per_hour' - i.e. data points per hour
+fn to_kw(w: f64, units_per_hour: i64) -> f64 {
+    (w * units_per_hour as f64 / 10.0).round() / 100.0
 }
 
 /// Transforms the Block as given from MyGrid, i.e. the SourceBlock the dash representation of a Block
@@ -158,6 +159,7 @@ fn transform_source_block(block: &SourceBlock) -> Block {
         block_type: block.block_type.clone(),
         start_time: block.start_time,
         cost: format!("{:05.2}", block.cost),
+        true_soc_in: block.true_soc_in,
         soc_in: block.soc_in,
         soc_out: block.soc_out,
         status: block.status.to_string(),
