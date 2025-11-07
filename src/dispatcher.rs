@@ -37,7 +37,9 @@ pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, confi
             return;
         }
     };
-    let _ = &disp.update_mygrid_data().await;
+    if let Err(e) = &disp.update_mygrid_data().await {
+        error!("while updating mygrid data: {}", e);
+    }
 
     match dispatch_loop(tx, rx, &mut disp).await {
         Ok(_) => {
