@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Add;
 use std::path::PathBuf;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use glob::glob;
@@ -10,6 +11,8 @@ use crate::traits::MyGrid;
 pub mod models;
 pub mod errors;
 
+/// Size of the smallest block possible in minutes
+const BLOCK_UNIT_SIZE: i64 = 15;
 
 /// Reads current schedule from mygrid and returns the block(s)
 /// 
@@ -151,9 +154,7 @@ fn to_kw(w: f64, units_per_hour: i64) -> f64 {
 ///
 /// * 'block' - input block of type SourceBlock
 fn transform_source_block(block: &SourceBlock) -> Block {
-    let delta = block.end_time - block.start_time;
-    let hours = delta.num_hours();
-    let minutes = delta.num_minutes() - hours * 60;
+    let length = block.end_time.add(TimeDelta::minutes(BLOCK_UNIT_SIZE)) - block.start_time;
 
     Block {
         block_type: block.block_type.clone(),
@@ -164,6 +165,6 @@ fn transform_source_block(block: &SourceBlock) -> Block {
         soc_out: block.soc_out,
         status: block.status.to_string(),
         start: block.start_time.format("%H:%M").to_string(),
-        length: format!("{:02}:{:02}", hours + 1, minutes), // Need to add one hour since end_time is inclusive,
+        length: format!("{:02}:{:02}", length.num_hours(), length.num_minutes() - length.num_hours() * 60),
     }
 }

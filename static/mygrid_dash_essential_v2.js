@@ -57,10 +57,14 @@ function refreshData(forceRefresh) {
         schedule_body.empty();
         for (let i = 0; i < resp.schedule.length; i++) {
             let row = resp.schedule[i];
+            let true_soc_in = '--';
+            if (row.true_soc_in != null) {
+                true_soc_in = row.true_soc_in;
+            }
 
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
-                row.cost + '</td><td>' + row.status + '</td></tr>');
+                true_soc_in + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
     });
     
