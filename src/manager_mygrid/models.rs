@@ -16,7 +16,7 @@ pub struct ForecastValues {
 pub struct ProductionValues {
     #[serde(rename(deserialize = "valid_time"))]
     pub date_time: DateTime<Local>,
-    pub power: f64
+    pub data: f64
 }
 
 
@@ -24,7 +24,7 @@ pub struct ProductionValues {
 pub struct ConsumptionValues {
     #[serde(rename(deserialize = "valid_time"))]
     pub date_time: DateTime<Local>,
-    pub power: f64
+    pub data: f64
 }
 
 #[derive(Deserialize)]
@@ -38,7 +38,7 @@ pub struct TariffValues {
 #[derive(Deserialize)]
 pub struct BaseData {
     pub forecast: Vec<ForecastValues>,
-    pub production_kw: Vec<ProductionValues>,
+    pub production: Vec<ProductionValues>,
     pub consumption: Vec<ConsumptionValues>,
     pub tariffs: Vec<TariffValues>,
 }
@@ -78,6 +78,7 @@ pub struct SourceBlock {
     pub start_time: DateTime<Local>,
     pub end_time: DateTime<Local>,
     pub cost: f64,
+    pub true_soc_in: Option<usize>,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: Status,
@@ -89,6 +90,7 @@ pub struct Block {
     #[serde(skip_serializing)]
     pub start_time: DateTime<Local>,
     pub cost: String,
+    pub true_soc_in: Option<usize>,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: String,
