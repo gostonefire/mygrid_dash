@@ -118,6 +118,8 @@ impl Dispatcher {
         Ok(Self {
             schedule: Vec::new(),
             mygrid_data: MygridData {
+                base_cost: 0.0,
+                schedule_cost: 0.0,
                 forecast_temp: Vec::new(),
                 forecast_cloud: Vec::new(),
                 prod: Vec::new(),
@@ -188,6 +190,8 @@ impl Dispatcher {
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
             schedule: &'a Vec<Block>,
+            base_cost: f64,
+            schedule_cost: f64,
         }
         
         let reply = SmallDashData {
@@ -215,6 +219,8 @@ impl Dispatcher {
                 data: &self.mygrid_data.tariffs_buy,
             },
             schedule: &self.schedule,
+            base_cost: self.mygrid_data.base_cost,
+            schedule_cost: self.mygrid_data.schedule_cost,
         };
         Ok(serde_json::to_string_pretty(&reply)?)
     }

@@ -54,10 +54,14 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
     let mut tariffs_buy: HashMap<DateTime<Utc>, DataItem<f64>> = HashMap::new();
     let mut tariffs_sell: HashMap<DateTime<Utc>, DataItem<f64>> = HashMap::new();
     let mut tariffs_policy: HashMap<DateTime<Local>, f64> = HashMap::new();
-
+    let mut base_cost: f64 = 0.0;
+    let mut schedule_cost: f64 = 0.0;
+    
     for file in files {
         let json = tokio::fs::read_to_string(file).await?;
         let base_data: BaseData = serde_json::from_str(&json)?;
+        base_cost = base_data.base_cost;
+        schedule_cost = base_data.schedule_cost;
         
         for d in base_data.forecast {
             let datetime = d.date_time.with_timezone(&Utc);
@@ -84,6 +88,8 @@ pub async fn get_base_data(base_data_path: &str, from: DateTime<Local>, to: Date
     }
 
     let mut mygrid = MygridData {
+        base_cost,
+        schedule_cost,
         forecast_temp: Vec::new(),
         forecast_cloud: Vec::new(),
         prod: Vec::new(),

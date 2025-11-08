@@ -56,6 +56,8 @@ pub struct RealTimeData {
     pub timestamp: i64,
 }
 pub struct MygridData {
+    pub base_cost: f64,
+    pub schedule_cost: f64,
     pub forecast_temp: Vec<DataItem<f64>>,
     pub forecast_cloud: Vec<DataItem<f64>>,
     pub prod: Vec<DataItem<f64>>,
