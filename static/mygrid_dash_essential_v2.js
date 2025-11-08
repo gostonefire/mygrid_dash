@@ -52,7 +52,7 @@ function refreshData(forceRefresh) {
         temp.updateSeries(resp.temp_diagram);
         tariffs_buy.updateSeries([resp.tariffs_buy]);
 
-        $("#schedule-saving").text("Scheduling saves: " + (resp.schedule_cost - resp.base_cost).toFixed(2));
+        $("#schedule-saving").text("Scheduling saves: " + (resp.base_cost - resp.schedule_cost).toFixed(2));
         let schedule_body = $('#schedule-body');
 
         schedule_body.empty();
