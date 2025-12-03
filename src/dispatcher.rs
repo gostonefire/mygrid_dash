@@ -386,9 +386,7 @@ impl Dispatcher {
             let history = self.fox_cloud.get_device_history_data(start, utc_now).await?;
             last_end_time = history.last_end_time;
             
-            for (i, time) in history.time.iter().enumerate() {
-                let date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?.and_utc();
-
+            for (i, &date_time) in history.time.iter().enumerate() {
                 self.history_data.soc_history.push(DataItem { x: date_time, y: history.soc[i] });
                 self.history_data.prod_history.push(DataItem { x: date_time, y: history.pv_power[i] });
                 self.history_data.load_history.push(DataItem { x: date_time, y: history.ld_power[i] });

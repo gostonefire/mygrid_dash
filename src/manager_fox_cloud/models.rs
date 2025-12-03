@@ -43,7 +43,7 @@ pub struct DeviceHistoryResult {
 
 pub struct DeviceHistory {
     pub last_end_time: DateTime<Utc>,
-    pub time: Vec<String>,
+    pub time: Vec<DateTime<Utc>>,
     pub pv_power: Vec<f64>,
     pub ld_power: Vec<f64>,
     pub soc: Vec<u8>,

@@ -3,7 +3,7 @@ mod models;
 
 use std::str::FromStr;
 use std::time::Duration;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
@@ -174,7 +174,7 @@ impl Fox {
 /// * 'last_end_time' - the last given end time when requesting history data
 /// * 'input' - the data to transform
 fn transform_history_data(last_end_time: DateTime<Utc>, input: Vec<DeviceHistoryData>) -> Result<DeviceHistory, FoxError> {
-    let mut time: Vec<String> = Vec::new();
+    let mut time: Vec<DateTime<Utc>> = Vec::new();
     let mut pv_power: Vec<f64> = Vec::new();
     let mut ld_power: Vec<f64> = Vec::new();
     let mut soc: Vec<u8> = Vec::new();
@@ -182,10 +182,9 @@ fn transform_history_data(last_end_time: DateTime<Utc>, input: Vec<DeviceHistory
     for set in &input[0].data_set {
         if set.variable == "pvPower" {
             for data in &set.data {
-                let ndt = NaiveDateTime::parse_from_str(&data.time, "%Y-%m-%d %H:%M:%S %Z")?
-                    .format("%Y-%m-%d %H:%M").to_string();
+                let date_time = cet_to_utc(&data.time)?;
 
-                time.push(ndt);
+                time.push(date_time);
                 pv_power.push(data.value);
             }
         } else if set.variable == "loadsPower" {
@@ -206,6 +205,16 @@ fn transform_history_data(last_end_time: DateTime<Utc>, input: Vec<DeviceHistory
         ld_power,
         soc,
     })
+}
+
+/// Converts a date time string in special Fox format to UTC
+///
+/// # Arguments
+///
+/// * 'time' - date time string in 2025-12-03 00:08:51 CET+0100 format
+fn cet_to_utc(time: &str) -> Result<DateTime<Utc>, FoxError> {
+    let dt = DateTime::parse_from_str(&time.replace("+", " +"), "%Y-%m-%d %H:%M:%S %Z %z")?;
+    Ok(dt.with_timezone(&Utc))
 }
 
 #[derive(Serialize, Deserialize)]
