@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use serde::{self, Serialize, Serializer};
 
 
@@ -11,11 +11,11 @@ use serde::{self, Serialize, Serializer};
 /// * 'date_time' - the date time object
 /// * 'serializer' - serializer given from serde
 pub fn serialize<S>(
-    date: &DateTime<Local>,
+    date: &DateTime<Utc>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    date.naive_local().and_utc().timestamp_millis().serialize(serializer)
+    date.timestamp_millis().serialize(serializer)
 }

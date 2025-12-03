@@ -1,16 +1,14 @@
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct WeatherItem<T> {
-    pub x: DateTime<Local>,
+    pub x: DateTime<Utc>,
     pub y: T,
 }
 
 #[derive(Deserialize)]
-pub struct TwoDaysMinMax<T> {
-    pub yesterday_min: T,
-    pub yesterday_max: T,
-    pub today_min: T,
-    pub today_max: T,
+pub struct MinMax<T> {
+    pub min: T,
+    pub max: T,
 }

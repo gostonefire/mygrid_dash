@@ -2,11 +2,11 @@ pub mod errors;
 mod models;
 
 use std::time::Duration;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use reqwest::Client;
 use crate::manager_weather::errors::WeatherError;
-use crate::manager_weather::models::{TwoDaysMinMax, WeatherItem};
-use crate::models::{DataItem, MinMax};
+use crate::manager_weather::models::{MinMax, WeatherItem};
+use crate::models::DataItem;
 
 
 /// Weather manager
@@ -40,7 +40,7 @@ impl Weather {
     /// * 'from' - from datetime
     /// * 'to' - to datetime
     /// * 'ensure_from' - if true the 'from' date will have a data item
-    pub async fn get_temp_history(&self, from: DateTime<Local>, to: DateTime<Local>, ensure_from: bool) -> Result<Vec<DataItem<f64>>, WeatherError> {
+    pub async fn get_temp_history(&self, from: DateTime<Utc>, to: DateTime<Utc>, ensure_from: bool) -> Result<Vec<DataItem<f64>>, WeatherError> {
         let url = format!("http://{}/temperature", self.host);
         
         let req = self.client.get(&url)
@@ -61,12 +61,16 @@ impl Weather {
 
     
     /// Returns today's and yesterday's min/max temperatures
-    /// 
-    pub async fn get_min_max(&self) -> Result<MinMax, WeatherError> {
+    ///
+    /// # Arguments
+    ///
+    /// * 'from' - from date time
+    /// * 'to' - to date time (non-inclusive)
+    pub async fn get_min_max(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<(f64, f64), WeatherError> {
         let url = format!("http://{}/minmax", self.host);
 
         let req = self.client.get(&url)
-            .query(&[("id", &self.sensor)])
+            .query(&[("id", &self.sensor),("from", &from.to_rfc3339()),("to", &to.to_rfc3339())])
             .send().await?;
 
         let status = req.status();
@@ -75,14 +79,9 @@ impl Weather {
         }
 
         let json = req.text().await?;
-        let minmax: TwoDaysMinMax<f64> = serde_json::from_str(&json)?;
+        let minmax: MinMax<f64> = serde_json::from_str(&json)?;
        
-        Ok(MinMax {
-            yesterday_min: minmax.yesterday_min,
-            yesterday_max: minmax.yesterday_max,
-            today_min: minmax.today_min,
-            today_max: minmax.today_max,
-        })
+        Ok((minmax.min, minmax.max))
     }
 }
 
@@ -96,7 +95,7 @@ impl Weather {
 /// * 'history' - the history data to transform
 /// * 'from' - optional from date to include with a data item
 /// * 'to' - to date to include with a data item
-fn transform_history<T: Copy>(history: Vec<WeatherItem<T>>, from: Option<DateTime<Local>>, to: DateTime<Local>) -> Vec<DataItem<T>> {
+fn transform_history<T: Copy>(history: Vec<WeatherItem<T>>, from: Option<DateTime<Utc>>, to: DateTime<Utc>) -> Vec<DataItem<T>> {
     let mut result: Vec<DataItem<T>> = Vec::new();
     
     if history.len() == 0 {

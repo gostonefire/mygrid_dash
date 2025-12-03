@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Add;
-use chrono::{DateTime, Datelike, Local, TimeDelta};
+use chrono::{DateTime, Datelike, TimeDelta, Utc};
 use log::error;
 use crate::manager_mygrid::models::{Block, BlockType};
 use crate::models::PolicyData;
@@ -138,7 +138,7 @@ fn winter_policy(data: PolicyData) -> u8 {
 /// # Arguments
 /// 
 /// * 'data' - a vector of schedule blocks
-fn net_consume_at(data: &Vec<Block>) -> Option<DateTime<Local>> {
+fn net_consume_at(data: &Vec<Block>) -> Option<DateTime<Utc>> {
     data.iter().rev().filter(|b| b.block_type != BlockType::Use).last().map(|b| b.start_time)
 }
 
@@ -148,7 +148,7 @@ fn net_consume_at(data: &Vec<Block>) -> Option<DateTime<Local>> {
 /// 
 /// * 'date_time' - a datetime (hour) to start evaluating from
 /// * 'tariffs' - hourly buy tariffs
-fn tariff_color_future(date_time: Option<DateTime<Local>>, tariffs: &HashMap<DateTime<Local>, f64>) -> Option<TariffColor> {
+fn tariff_color_future(date_time: Option<DateTime<Utc>>, tariffs: &HashMap<DateTime<Utc>, f64>) -> Option<TariffColor> {
     if let Some(date_time) = date_time {
         let mut max_cost: f64 = 0.0;
 
@@ -169,7 +169,7 @@ fn tariff_color_future(date_time: Option<DateTime<Local>>, tariffs: &HashMap<Dat
 ///
 /// * 'date_time' - a datetime (hour) to evaluate
 /// * 'tariffs' - hourly buy tariffs
-fn tariff_color_now(date_time: DateTime<Local>, tariffs: &HashMap<DateTime<Local>, f64>) -> TariffColor {
+fn tariff_color_now(date_time: DateTime<Utc>, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
     cost_to_color(tariffs.get(&date_time).map(|&c| c))
 }
 

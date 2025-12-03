@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::ops::Add;
-use chrono::{DateTime, Datelike, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Utc};
+use chrono::{DateTime, Duration, DurationRound, Local, NaiveDateTime, TimeDelta, Timelike, Utc};
 use log::{error, info};
 use serde::Serialize;
 use tokio::select;
@@ -11,7 +11,7 @@ use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
 use crate::manager_weather::Weather;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, MinMax, WeatherData};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, TwoDayMinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -148,7 +148,7 @@ impl Dispatcher {
             },
             weather_data: WeatherData {
                 temp_history: Vec::new(),
-                min_max: MinMax {
+                min_max: TwoDayMinMax {
                     yesterday_min: 0.0,
                     yesterday_max: 0.0,
                     today_min: 0.0,
@@ -321,27 +321,31 @@ impl Dispatcher {
     /// Updates weather data
     /// 
     async fn update_weather(&mut self) -> Result<(), DispatcherError> {
-        let local_now = Local::now();
-        let utc_now = local_now.with_timezone(&Utc);
+        let utc_now = Utc::now();
+        let (today_start, today_end) = get_utc_day_start(utc_now, 0);
+        let (yesterday_start, yesterday_end) = get_utc_day_start(utc_now, -1);
 
         // Check if update is needed
-        if self.weather_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() &&
+        if self.weather_data.last_end_time >= today_start &&  self.weather_data.last_end_time < today_end  &&
             utc_now - self.weather_data.last_end_time < Duration::minutes(5)
         {
             return Ok(())
         }
         
         info!("updating weather data");
-        let from = local_now.duration_trunc(TimeDelta::days(1))?;
-        let history = self.weather.get_temp_history(from, local_now, true).await?;
+
+        let history = self.weather.get_temp_history(today_start, utc_now, true).await?;
         let last = history.len();
         
         self.weather_data.temp_history = history;
         if last != 0 {
             self.weather_data.temp_current = self.weather_data.temp_history[last - 1].y;
         }
-        
-        self.weather_data.min_max = self.weather.get_min_max().await?;
+
+
+        let (yesterday_min, yesterday_max) = self.weather.get_min_max(yesterday_start, yesterday_end).await?;
+        let (today_min, today_max) = self.weather.get_min_max(today_start, today_end).await?;
+        self.weather_data.min_max = TwoDayMinMax { yesterday_min, yesterday_max, today_min, today_max };
         
         self.weather_data.last_end_time = utc_now;
         
@@ -352,11 +356,14 @@ impl Dispatcher {
     /// from midnight if old data is from yesterday
     /// 
     async fn update_history(&mut self) -> Result<(), DispatcherError> {
-        let local_now = Local::now();
-        let utc_now = local_now.with_timezone(&Utc);
+        let utc_now = Utc::now();
+        let (today_start, today_end) = get_utc_day_start(utc_now, 0);
+
+        //let local_now = Local::now();
+        //let utc_now = local_now.with_timezone(&Utc);
         
         // Check if update is needed
-        if self.history_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() &&
+        if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end &&
             utc_now - self.history_data.last_end_time <= Duration::minutes(10) 
         {
             return Ok(())
@@ -365,8 +372,8 @@ impl Dispatcher {
         info!("updating SoC, pvPower and loadsPower history from FoxESS Cloud");
         let mut last_end_time: DateTime<Utc> = utc_now;
         
-        let mut start = local_now.duration_trunc(TimeDelta::days(1))?.with_timezone(&Utc);
-        if self.history_data.last_end_time.with_timezone(&Local).ordinal0() == local_now.ordinal0() {
+        let mut start = today_start;
+        if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end {
             start = self.history_data.last_end_time.add(TimeDelta::seconds(1));
             last_end_time = self.history_data.last_end_time;
         } else {
@@ -380,9 +387,8 @@ impl Dispatcher {
             last_end_time = history.last_end_time;
             
             for (i, time) in history.time.iter().enumerate() {
-                let naive_date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?;
-                let date_time = naive_date_time.and_local_timezone(Local).unwrap();
-                
+                let date_time = NaiveDateTime::parse_from_str(time, "%Y-%m-%d %H:%M")?.and_utc();
+
                 self.history_data.soc_history.push(DataItem { x: date_time, y: history.soc[i] });
                 self.history_data.prod_history.push(DataItem { x: date_time, y: history.pv_power[i] });
                 self.history_data.load_history.push(DataItem { x: date_time, y: history.ld_power[i] });
@@ -401,12 +407,11 @@ impl Dispatcher {
     /// 
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
         self.schedule =  get_schedule(&self.schedule_path).await?;
-        
-        let local_now = Local::now();
-        let from = local_now.duration_trunc(TimeDelta::days(1))?;
-        let to = from.add(TimeDelta::days(1));
 
-        self.mygrid_data = get_base_data(&self.base_data_path, from, to).await?;
+        let utc_now = Utc::now();
+        let (today_start, _) = get_utc_day_start(utc_now, 0);
+
+        self.mygrid_data = get_base_data(&self.base_data_path, today_start).await?;
             
         Ok(())
     }
@@ -455,7 +460,7 @@ impl Dispatcher {
             load: self.real_time_data.load,
             soc: self.real_time_data.soc,
             policy_tariffs: &self.mygrid_data.policy_tariffs,
-            date_time: Local::now().duration_trunc(TimeDelta::minutes(15))?,
+            date_time: Utc::now().duration_trunc(TimeDelta::minutes(15))?,
         };
         
         self.usage_policy = get_policy(data) * 10;
@@ -512,4 +517,20 @@ fn get_wma(vec_in: &VecDeque<f64>) -> f64 {
 /// * 'a' - value to round
 fn two_decimals(a: f64) -> f64 {
     (a * 100.0).round() / 100.0
+}
+
+/// Returns the start and end (non-inclusive) of a day in UTC time
+///
+/// # Arguments
+///
+/// * 'date_time' - date time to get utc day start and end for (in relation to Local timezone)
+/// * 'day_index' - 0-based index of the day, 0 is today, -1 is yesterday, etc.
+pub fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>, DateTime<Utc>) {
+    // Since truncating a local time at day of DST going winter, after shift to winter time,
+    // moves time 24 hours back (resulting in a time after midnight), we need to truncate twice
+    let date = date_time.with_timezone(&Local).with_hour(12).unwrap().add(TimeDelta::days(day_index));
+    let start = date.duration_trunc(TimeDelta::days(1)).unwrap().duration_trunc(TimeDelta::days(1)).unwrap();
+    let end = date.add(TimeDelta::days(1)).duration_trunc(TimeDelta::days(1)).unwrap().duration_trunc(TimeDelta::days(1)).unwrap();
+
+    (start.with_timezone(&Utc), end.with_timezone(&Utc))
 }

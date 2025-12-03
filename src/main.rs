@@ -26,7 +26,6 @@ mod handlers;
 mod serialize_timestamp;
 mod models;
 mod usage_policy;
-mod traits;
 mod manager_weather;
 mod manager_tokens;
 

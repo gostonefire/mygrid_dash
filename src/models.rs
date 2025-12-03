@@ -1,9 +1,8 @@
 use std::collections::{HashMap, VecDeque};
-use chrono::{DateTime, DurationRound, Local, RoundingError, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use crate::manager_mygrid::models::Block;
 use crate::serialize_timestamp;
-use crate::traits::MyGrid;
 
 #[derive(Serialize)]
 pub struct DataPoint<T> {
@@ -14,7 +13,7 @@ pub struct DataPoint<T> {
 #[derive(Serialize, Clone)]
 pub struct DataItem<T> {
     #[serde(with = "serialize_timestamp")]
-    pub x: DateTime<Local>,
+    pub x: DateTime<Utc>,
     pub y: T,
 }
 
@@ -26,7 +25,7 @@ pub struct Series<'a, T> {
     pub data: &'a Vec<T>,
 }
 
-pub struct MinMax {
+pub struct TwoDayMinMax {
     pub yesterday_min: f64,
     pub yesterday_max: f64,
     pub today_min: f64,
@@ -35,7 +34,7 @@ pub struct MinMax {
 
 pub struct WeatherData {
     pub temp_history: Vec<DataItem<f64>>,
-    pub min_max: MinMax,
+    pub min_max: TwoDayMinMax,
     pub temp_current: f64,
     pub last_end_time: DateTime<Utc>,
 }
@@ -64,7 +63,7 @@ pub struct MygridData {
     pub load: Vec<DataItem<f64>>,
     pub tariffs_buy: Vec<DataItem<f64>>,
     pub tariffs_sell: Vec<DataItem<f64>>,
-    pub policy_tariffs: HashMap<DateTime<Local>, f64>,
+    pub policy_tariffs: HashMap<DateTime<Utc>, f64>,
 }
 
 pub struct PolicyData<'a> {
@@ -72,24 +71,7 @@ pub struct PolicyData<'a> {
     pub prod: f64, 
     pub load: f64, 
     pub soc: u8, 
-    pub policy_tariffs: &'a HashMap<DateTime<Local>, f64>, 
-    pub date_time: DateTime<Local>,
-}
-
-
-impl MyGrid for DataItem<f64> {
-    type Item = DataItem<f64>;
-
-    fn is_within(&self, start: DateTime<Local>, end: DateTime<Local>) -> bool {
-        self.x >= start && self.x < end
-    }
-
-    fn date_time_hour(&self) -> Result<DateTime<Local>, RoundingError> {
-        self.x.duration_trunc(TimeDelta::hours(1))
-    }
-
-    fn create_new(&self, date_time: DateTime<Local>) -> Self::Item {
-        Self::Item { x: date_time, y: self.y }
-    }
+    pub policy_tariffs: &'a HashMap<DateTime<Utc>, f64>, 
+    pub date_time: DateTime<Utc>,
 }
 
