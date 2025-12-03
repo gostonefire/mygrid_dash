@@ -49,6 +49,7 @@ let prod_options = {
         },
         labels: {
             show: false,
+            datetimeUTC: false,
         },
     },
     tooltip: {

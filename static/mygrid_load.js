@@ -49,6 +49,7 @@ let load_options = {
         },
         labels: {
             show: true,
+            datetimeUTC: false,
         },
     },
     tooltip: {

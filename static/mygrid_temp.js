@@ -49,6 +49,7 @@ let temp_options = {
         },
         labels: {
             show: true,
+            datetimeUTC: false,
         },
     },
     tooltip: {

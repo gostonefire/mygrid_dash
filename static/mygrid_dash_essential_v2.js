@@ -73,13 +73,11 @@ function refreshData(forceRefresh) {
     let coeff = 1000 * 60 * 15;
     let datetime_quarters = new Date(Math.floor(datetime.getTime() / coeff) * coeff);
 
-    let offset = datetime.getTimezoneOffset() * 60 * 1000;
-
     tariffs_buy.updateOptions({
         annotations: {
             xaxis: [
                 {
-                    x: datetime_quarters.getTime() - offset,
+                    x: datetime_quarters.getTime(),
                 },
             ]
         }
@@ -88,7 +86,7 @@ function refreshData(forceRefresh) {
         annotations: {
             xaxis: [
                 {
-                    x: datetime.getTime() - offset,
+                    x: datetime.getTime(),
                 },
             ]
         }

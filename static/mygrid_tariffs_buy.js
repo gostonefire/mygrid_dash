@@ -57,6 +57,7 @@ let tariffs_buy_options= {
         },
         labels: {
             show: true,
+            datetimeUTC: false,
         },
     },
     tooltip: {
