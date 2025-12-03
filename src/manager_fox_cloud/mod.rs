@@ -3,7 +3,7 @@ mod models;
 
 use std::str::FromStr;
 use std::time::Duration;
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
