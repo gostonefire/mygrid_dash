@@ -60,11 +60,11 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         }
 
         for d in base_data.production {
-            mygrid.prod.push(DataItem { x: d.date_time, y: to_kw(d.data, 12) });
+            mygrid.prod.push(DataItem { x: d.date_time, y: to_kw(d.data, 1) });
         }
 
         for d in base_data.consumption {
-            mygrid.load.push(DataItem { x: d.date_time, y: to_kw(d.data, 12) });
+            mygrid.load.push(DataItem { x: d.date_time, y: to_kw(d.data, 1) });
         }
 
         for d in base_data.tariffs {
