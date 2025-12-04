@@ -1,4 +1,5 @@
 use std::{env, fs};
+use chrono::{DateTime, Local};
 use jsonwebtoken::jwk::JwkSet;
 use log::LevelFilter;
 use serde::Deserialize;
@@ -54,6 +55,7 @@ pub struct Weather {
 
 #[derive(Deserialize, Clone)]
 pub struct General {
+    pub debug_run_time: Option<DateTime<Local>>,
     pub log_path: String,
     pub log_level: LevelFilter,
     pub log_to_stdout: bool,

@@ -67,29 +67,29 @@ function refreshData(forceRefresh) {
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
                 true_soc_in + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
-    });
-    
-    let datetime = new Date();
-    let coeff = 1000 * 60 * 15;
-    let datetime_quarters = new Date(Math.floor(datetime.getTime() / coeff) * coeff);
 
-    tariffs_buy.updateOptions({
-        annotations: {
-            xaxis: [
-                {
-                    x: datetime_quarters.getTime(),
-                },
-            ]
-        }
-    });
-    temp.updateOptions({
-        annotations: {
-            xaxis: [
-                {
-                    x: datetime.getTime(),
-                },
-            ]
-        }
+        let datetime = new Date();
+        let coeff = 1000 * 60 * 15;
+        let datetime_quarters = new Date(Math.floor((datetime.getTime() - resp.time_delta) / coeff) * coeff);
+
+        tariffs_buy.updateOptions({
+            annotations: {
+                xaxis: [
+                    {
+                        x: datetime_quarters.getTime(),
+                    },
+                ]
+            }
+        });
+        temp.updateOptions({
+            annotations: {
+                xaxis: [
+                    {
+                        x: datetime.getTime() - resp.time_delta,
+                    },
+                ]
+            }
+        });
     });
 }
 

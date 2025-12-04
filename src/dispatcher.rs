@@ -103,6 +103,7 @@ struct Dispatcher {
     weather_data: WeatherData,
     usage_policy: u8,
     last_request: i64,
+    time_delta: TimeDelta,
 }
 
 impl Dispatcher {
@@ -114,6 +115,11 @@ impl Dispatcher {
     async fn new(config: &Config) -> Result<Self, DispatcherError> {
         let fox_cloud = Fox::new(&config.fox_ess)?;
         let weather = Weather::new(&config.weather.host, &config.weather.sensor)?;
+        let time_delta = if let Some(debug_run_time) = config.general.debug_run_time {
+            Utc::now() - debug_run_time.with_timezone(&Utc)
+        } else {
+            TimeDelta::seconds(0)
+        };
         
         Ok(Self {
             schedule: Vec::new(),
@@ -159,6 +165,7 @@ impl Dispatcher {
             },
             usage_policy: 0,
             last_request: 0,
+            time_delta,
         })
     }
 
@@ -192,6 +199,7 @@ impl Dispatcher {
             schedule: &'a Vec<Block>,
             base_cost: f64,
             schedule_cost: f64,
+            time_delta: i64,
         }
         
         let reply = SmallDashData {
@@ -221,6 +229,7 @@ impl Dispatcher {
             schedule: &self.schedule,
             base_cost: self.mygrid_data.base_cost,
             schedule_cost: self.mygrid_data.schedule_cost,
+            time_delta: self.time_delta.num_milliseconds(),
         };
         Ok(serde_json::to_string_pretty(&reply)?)
     }
@@ -243,6 +252,7 @@ impl Dispatcher {
             load_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             cloud_diagram: Series<'a, DataItem<f64>>,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
+            time_delta: i64,
         }
 
         let reply = FullDashData {
@@ -314,14 +324,17 @@ impl Dispatcher {
                     data: &self.weather_data.temp_history,
                 },
             ),
+            time_delta: self.time_delta.num_milliseconds(),
         };
         Ok(serde_json::to_string_pretty(&reply)?)
     }
 
     /// Updates weather data
-    /// 
-    async fn update_weather(&mut self) -> Result<(), DispatcherError> {
-        let utc_now = Utc::now();
+    ///
+    /// # Arguments
+    ///
+    /// * 'utc_now' - 'now' according to the Utc timezone
+    async fn update_weather(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
         let (today_start, today_end) = get_utc_day_start(utc_now, 0);
         let (yesterday_start, yesterday_end) = get_utc_day_start(utc_now, -1);
 
@@ -354,14 +367,13 @@ impl Dispatcher {
     
     /// Updates all history fields with fresh data, either delta since last update or
     /// from midnight if old data is from yesterday
-    /// 
-    async fn update_history(&mut self) -> Result<(), DispatcherError> {
-        let utc_now = Utc::now();
+    ///
+    /// # Arguments
+    ///
+    /// * 'utc_now' - 'now' according to the Utc timezone
+    async fn update_history(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
         let (today_start, today_end) = get_utc_day_start(utc_now, 0);
 
-        //let local_now = Local::now();
-        //let utc_now = local_now.with_timezone(&Utc);
-        
         // Check if update is needed
         if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end &&
             utc_now - self.history_data.last_end_time <= Duration::minutes(10) 
@@ -402,12 +414,11 @@ impl Dispatcher {
     /// 
     /// Base data from mygrid starts with current hour, so the update routine only updates 
     /// current hour and onward to keep an entire day in stock.
-    /// 
+    ///
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
         self.schedule =  get_schedule(&self.schedule_path).await?;
 
-        let utc_now = Utc::now();
-        let (today_start, _) = get_utc_day_start(utc_now, 0);
+        let (today_start, _) = get_utc_day_start(self.utc_now(), 0);
 
         self.mygrid_data = get_base_data(&self.base_data_path, today_start).await?;
             
@@ -418,9 +429,12 @@ impl Dispatcher {
     /// We keep 2 and add the latest to have three values to return as a weighted moving average
     /// 
     /// If the currently stored real time data is older than 10 minutes we start from scratch
-    /// 
-    async fn update_real_time_data(&mut self) -> Result<(), DispatcherError> {
-        let timestamp = Utc::now().timestamp();
+    ///
+    /// # Arguments
+    ///
+    /// * 'utc_now' - 'now' according to the Utc timezone
+    async fn update_real_time_data(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+        let timestamp = utc_now.timestamp();
         if timestamp - self.real_time_data.timestamp < 180 { return Ok(())}
             
         info!("updating real time data");
@@ -450,15 +464,18 @@ impl Dispatcher {
     }
     
     /// Evaluates usage policy
-    /// 
-    fn evaluate_policy(&mut self) -> Result<(), DispatcherError> {
+    ///
+    /// # Arguments
+    ///
+    /// * 'utc_now' - 'now' according to the Utc timezone
+    fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
         let data = PolicyData {
             schedule: &self.schedule,
             prod: self.real_time_data.prod,
             load: self.real_time_data.load,
             soc: self.real_time_data.soc,
             policy_tariffs: &self.mygrid_data.policy_tariffs,
-            date_time: Utc::now().duration_trunc(TimeDelta::minutes(15))?,
+            date_time: utc_now.duration_trunc(TimeDelta::minutes(15))?,
         };
         
         self.usage_policy = get_policy(data) * 10;
@@ -472,18 +489,26 @@ impl Dispatcher {
     /// 
     /// * 'reset_last_request' - whether to reset or not
     async fn check_updates(&mut self, reset_last_request: bool) -> Result<(), DispatcherError> {
+        let utc_now = self.utc_now();
+
         if reset_last_request {
-            self.last_request = Utc::now().timestamp();
+            self.last_request = utc_now.timestamp();
         }
         
-        if Utc::now().timestamp() - self.last_request <= 1800 {
-            let _ = self.update_weather().await?;
-            let _ = self.update_real_time_data().await?;
-            let _ = self.update_history().await?;
-            let _ = self.evaluate_policy()?;
+        if utc_now.timestamp() - self.last_request <= 1800 {
+            let _ = self.update_weather(utc_now).await?;
+            let _ = self.update_real_time_data(utc_now).await?;
+            let _ = self.update_history(utc_now).await?;
+            let _ = self.evaluate_policy(utc_now)?;
         }
         
         Ok(())
+    }
+
+    /// Returns utc now with any configured time delta applied
+    ///
+    pub fn utc_now(&self) -> DateTime<Utc> {
+        Utc::now() - self.time_delta
     }
 }
 
@@ -532,3 +557,4 @@ pub fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<
 
     (start.with_timezone(&Utc), end.with_timezone(&Utc))
 }
+

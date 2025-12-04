@@ -42,29 +42,29 @@ function refreshData() {
         load.updateSeries(resp.load_diagram);
         cloud.updateSeries([resp.cloud_diagram]);
         temp.updateSeries(resp.temp_diagram);
-    });
 
-    let datetime = new Date();
-    let coeff = 1000 * 60 * 15;
-    let datetime_quarters = new Date(Math.floor(datetime.getTime() / coeff) * coeff);
+        let datetime = new Date();
+        let coeff = 1000 * 60 * 15;
+        let datetime_quarters = new Date(Math.floor((datetime.getTime() - resp.time_delta) / coeff) * coeff);
 
-    tariffs_buy.updateOptions({
-        annotations: {
-            xaxis: [
-                {
-                    x: datetime_quarters.getTime(),
-                },
-            ]
-        }
-    });
-    temp.updateOptions({
-        annotations: {
-            xaxis: [
-                {
-                    x: datetime.getTime(),
-                },
-            ]
-        }
+        tariffs_buy.updateOptions({
+            annotations: {
+                xaxis: [
+                    {
+                        x: datetime_quarters.getTime(),
+                    },
+                ]
+            }
+        });
+        temp.updateOptions({
+            annotations: {
+                xaxis: [
+                    {
+                        x: datetime.getTime() - resp.time_delta,
+                    },
+                ]
+            }
+        });
     });
 }
 
