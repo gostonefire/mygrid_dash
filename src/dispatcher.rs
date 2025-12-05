@@ -542,18 +542,24 @@ fn two_decimals(a: f64) -> f64 {
     (a * 100.0).round() / 100.0
 }
 
-/// Returns the start and end (non-inclusive) of a day in UTC time
+/// Returns the start and end (non-inclusive) of a day in UTC time.
+/// For DST switch days (summer to winter time and vice versa), the length of the day
+/// will be either 23 hours (in the spring) or 25 hours (in the autumn).
 ///
 /// # Arguments
 ///
 /// * 'date_time' - date time to get utc day start and end for (in relation to Local timezone)
 /// * 'day_index' - 0-based index of the day, 0 is today, -1 is yesterday, etc.
-pub fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>, DateTime<Utc>) {
-    // Since truncating a local time at day of DST going winter, after shift to winter time,
-    // moves time 24 hours back (resulting in a time after midnight), we need to truncate twice
+fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>, DateTime<Utc>) {
+    // First, go local and move hour to a safe place regarding DST day shift between summer and winter time.
+    // Also, apply the day index to get to the desired day.
     let date = date_time.with_timezone(&Local).with_hour(12).unwrap().add(TimeDelta::days(day_index));
-    let start = date.duration_trunc(TimeDelta::days(1)).unwrap().duration_trunc(TimeDelta::days(1)).unwrap();
-    let end = date.add(TimeDelta::days(1)).duration_trunc(TimeDelta::days(1)).unwrap().duration_trunc(TimeDelta::days(1)).unwrap();
+
+    // Then trunc to a whole hour and move time to the start of day local (Chrono manages offset change if necessary)
+    let start = date.duration_trunc(TimeDelta::hours(1)).unwrap().with_hour(0).unwrap();
+
+    // Then add one day and do the same as for start
+    let end = date.add(TimeDelta::days(1)).duration_trunc(TimeDelta::hours(1)).unwrap().with_hour(0).unwrap();
 
     (start.with_timezone(&Utc), end.with_timezone(&Utc))
 }
