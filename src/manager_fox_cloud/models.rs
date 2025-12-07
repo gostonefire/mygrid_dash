@@ -83,4 +83,5 @@ pub struct DeviceRealTime {
     pub pv_power: f64,
     pub ld_power: f64,
     pub soc: u8,
+    pub soh: u8,
 }

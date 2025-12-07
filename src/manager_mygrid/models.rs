@@ -89,8 +89,6 @@ pub struct SourceBlock {
 #[derive(Serialize)]
 pub struct Block {
     pub block_type: BlockType,
-    #[serde(skip_serializing)]
-    pub start_time: DateTime<Utc>,
     pub cost: String,
     pub true_soc_in: Option<usize>,
     pub soc_in: usize,

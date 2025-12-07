@@ -25,18 +25,17 @@ function refreshData() {
         }
 
         let color = "LimeGreen";
-        if (resp.policy <= 20) {
-            color = "Red"
-        } else if (resp.policy > 20 && resp.policy < 70) {
-            color = "Yellow"
+        if (resp.policy !== "Green") {
+            color = resp.policy
         }
-        $("#policy-bar").width(resp.policy + "%").css("background-color", color);
+
+        $("#policy-bar").width("100%").css("background-color", color);
         $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
         $("#minmax-today").text("Today: " + resp.today_max + " / " + resp.today_min + " ℃");
         $("#minmax-yesterday").text("Yesterday: " + resp.yesterday_max + " / " + resp.yesterday_min + " ℃");
         
         realtime.updateSeries([resp.current_prod_load]);
-        soc.updateSeries([resp.current_soc_policy]);
+        soc.updateSeries([resp.current_soc_soh]);
         tariffs_buy.updateSeries([resp.tariffs_buy]);
         production.updateSeries(resp.prod_diagram);
         load.updateSeries(resp.load_diagram);
@@ -70,7 +69,7 @@ function refreshData() {
 
 loadScriptSequentially('locale_se.js')
     .then(() => loadScriptSequentially('mygrid_realtime.js'))
-    .then(() => loadScriptSequentially('mygrid_soc_policy.js'))
+    .then(() => loadScriptSequentially('mygrid_soc_soh.js'))
     .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
     .then(() => loadScriptSequentially('mygrid_prod.js'))
     .then(() => loadScriptSequentially('mygrid_load.js'))

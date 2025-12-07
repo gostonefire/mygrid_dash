@@ -81,7 +81,7 @@ let soc_options = {
         enabled: false,
     },
     title: {
-        text: 'Current SoC & Policy',
+        text: 'Current SoC & SoH',
         floating: true,
         offsetY: 0,
         align: 'center',

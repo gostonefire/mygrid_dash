@@ -39,12 +39,11 @@ function refreshData(forceRefresh) {
         }
 
         let color = "LimeGreen";
-        if (resp.policy <= 20) {
-            color = "Red"
-        } else if (resp.policy > 20 && resp.policy < 70) {
-            color = "Yellow"
+        if (resp.policy !== "Green") {
+            color = resp.policy
         }
-        $("#policy-bar").width(resp.policy + "%").css("background-color", color);
+
+        $("#policy-bar").width("100%").css("background-color", color);
         $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
         $("#minmax-today").text("Today: " + resp.today_max + " / " + resp.today_min + " ℃");
         $("#minmax-yesterday").text("Yesterday: " + resp.yesterday_max + " / " + resp.yesterday_min + " ℃");

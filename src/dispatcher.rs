@@ -11,7 +11,7 @@ use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
 use crate::manager_weather::Weather;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, PolicyData, RealTimeData, Series, TwoDayMinMax, WeatherData};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TwoDayMinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -101,7 +101,7 @@ struct Dispatcher {
     history_data: HistoryData,
     real_time_data: RealTimeData,
     weather_data: WeatherData,
-    usage_policy: u8,
+    usage_policy: TariffColor,
     last_request: i64,
     time_delta: TimeDelta,
 }
@@ -146,6 +146,7 @@ impl Dispatcher {
             },
             real_time_data: RealTimeData {
                 soc: 0,
+                soh: 0,
                 prod: 0.0,
                 load: 0.0,
                 prod_data: VecDeque::new(),
@@ -163,7 +164,7 @@ impl Dispatcher {
                 temp_current: 0.0,
                 last_end_time: Default::default(),
             },
-            usage_policy: 0,
+            usage_policy: TariffColor::Green,
             last_request: 0,
             time_delta,
         })
@@ -188,7 +189,7 @@ impl Dispatcher {
     fn get_small_dash_data(&self) -> Result<String, DispatcherError> {
         #[derive(Serialize)]
         struct SmallDashData<'a> {
-            policy: u8,
+            policy: TariffColor,
             temp_current: f64,
             yesterday_min: f64,
             yesterday_max: f64,
@@ -203,7 +204,7 @@ impl Dispatcher {
         }
         
         let reply = SmallDashData {
-            policy: self.usage_policy,
+            policy: self.usage_policy.clone(),
             temp_current: self.weather_data.temp_current,
             yesterday_min: self.weather_data.min_max.yesterday_min,
             yesterday_max: self.weather_data.min_max.yesterday_max,
@@ -239,14 +240,14 @@ impl Dispatcher {
     fn get_full_dash_data(&self) -> Result<String, DispatcherError> {
         #[derive(Serialize)]
         struct FullDashData<'a> {
-            policy: u8,
+            policy: TariffColor,
             temp_current: f64,
             yesterday_min: f64,
             yesterday_max: f64,
             today_min: f64,
             today_max: f64,
             current_prod_load: Series<'a, DataPoint<f64>>,
-            current_soc_policy: Series<'a, DataPoint<u8>>,
+            current_soc_soh: Series<'a, DataPoint<u8>>,
             tariffs_buy: Series<'a, DataItem<f64>>,
             prod_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             load_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
@@ -256,7 +257,7 @@ impl Dispatcher {
         }
 
         let reply = FullDashData {
-            policy: self.usage_policy,
+            policy: self.usage_policy.clone(),
             temp_current: self.weather_data.temp_current,
             yesterday_min: self.weather_data.min_max.yesterday_min,
             yesterday_max: self.weather_data.min_max.yesterday_max,
@@ -270,12 +271,12 @@ impl Dispatcher {
                     DataPoint { x: "Load".to_string(), y: self.real_time_data.load }
                 ],
             },
-            current_soc_policy: Series {
+            current_soc_soh: Series {
                 name: String::new(),
                 chart_type: String::new(),
                 data: &vec![
                     DataPoint { x: "SoC".to_string(), y: self.real_time_data.soc },
-                    DataPoint { x: "Usage Policy".to_string(), y: self.usage_policy }
+                    DataPoint { x: "SoH".to_string(), y: self.real_time_data.soh, }
                 ],
             },
             tariffs_buy: Series {
@@ -445,6 +446,7 @@ impl Dispatcher {
 
         let real_time_data = self.fox_cloud.get_device_real_time_data().await?;
         self.real_time_data.soc = real_time_data.soc;
+        self.real_time_data.soh = real_time_data.soh;
         
         if self.real_time_data.prod_data.len() == 3 {
             self.real_time_data.prod_data.pop_front();
@@ -469,16 +471,11 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
-        let data = PolicyData {
-            schedule: &self.schedule,
-            prod: self.real_time_data.prod,
-            load: self.real_time_data.load,
-            soc: self.real_time_data.soc,
-            policy_tariffs: &self.mygrid_data.policy_tariffs,
-            date_time: utc_now.duration_trunc(TimeDelta::minutes(15))?,
-        };
-        
-        self.usage_policy = get_policy(data) * 10;
+        self.usage_policy = get_policy(
+            utc_now.duration_trunc(TimeDelta::minutes(15))?, 
+            self.real_time_data.soc, 
+            &self.mygrid_data.policy_tariffs,
+        );
         
         Ok(())
     }

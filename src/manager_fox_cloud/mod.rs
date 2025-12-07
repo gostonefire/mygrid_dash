@@ -72,7 +72,7 @@ impl Fox {
         let path = "/op/v1/device/real/query";
 
         let req = RequestDeviceRealTimeData {
-            variables: ["pvPower", "loadsPower", "SoC"]
+            variables: ["pvPower", "loadsPower", "SoC", "SOH"]
                 .iter().map(|s| s.to_string())
                 .collect::<Vec<String>>(),
             sns: vec![self.sn.clone()],
@@ -88,6 +88,7 @@ impl Fox {
             pv_power: 0.0,
             ld_power: 0.0,
             soc: 0,
+            soh: 0,
         };
         
         for data in fox_data.result[0].datas.iter() {
@@ -95,6 +96,7 @@ impl Fox {
                 "pvPower" => device_real_time.pv_power = data.value,
                 "loadsPower" => device_real_time.ld_power = data.value,
                 "SoC" => device_real_time.soc = data.value.round() as u8,
+                "SOH" => device_real_time.soh = data.value.round() as u8,
                 _ => (),
             }
         }

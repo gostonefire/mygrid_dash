@@ -1,8 +1,14 @@
 use std::collections::{HashMap, VecDeque};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use crate::manager_mygrid::models::Block;
 use crate::serialize_timestamp;
+
+#[derive(Serialize, PartialEq, Eq, Clone)]
+pub enum TariffColor {
+    Green,
+    Yellow,
+    Red,
+}
 
 #[derive(Serialize)]
 pub struct DataPoint<T> {
@@ -48,6 +54,7 @@ pub struct HistoryData {
 
 pub struct RealTimeData {
     pub soc: u8,
+    pub soh: u8,
     pub prod: f64,
     pub load: f64,
     pub prod_data: VecDeque<f64>,
@@ -65,13 +72,3 @@ pub struct MygridData {
     pub tariffs_sell: Vec<DataItem<f64>>,
     pub policy_tariffs: HashMap<DateTime<Utc>, f64>,
 }
-
-pub struct PolicyData<'a> {
-    pub schedule: &'a Vec<Block>, 
-    pub prod: f64, 
-    pub load: f64, 
-    pub soc: u8, 
-    pub policy_tariffs: &'a HashMap<DateTime<Utc>, f64>, 
-    pub date_time: DateTime<Utc>,
-}
-
