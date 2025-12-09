@@ -29,8 +29,11 @@ function refreshData() {
             color = resp.policy
         }
 
+        let temp_current = Math.round(resp.temp_current * 10) / 10;
+        let temp_perceived = Math.round(resp.temp_perceived * 10) / 10
+
         $("#policy-bar").width("100%").css("background-color", color);
-        $("#current-temp").text(Math.round(resp.temp_current * 10) / 10 + " ℃");
+        $("#current-temp").text(temp_current + " (" + temp_perceived + ") ℃");
         $("#minmax-today").text("Today: " + resp.today_max + " / " + resp.today_min + " ℃");
         $("#minmax-yesterday").text("Yesterday: " + resp.yesterday_max + " / " + resp.yesterday_min + " ℃");
         

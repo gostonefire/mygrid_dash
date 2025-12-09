@@ -5,8 +5,8 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use crate::manager_weather::errors::WeatherError;
-use crate::manager_weather::models::{MinMax, WeatherItem};
-use crate::models::DataItem;
+use crate::manager_weather::models::{MinMax, Temperature};
+use crate::models::{DataItem, TemperatureData};
 
 
 /// Weather manager
@@ -40,9 +40,9 @@ impl Weather {
     /// * 'from' - from datetime
     /// * 'to' - to datetime
     /// * 'ensure_from' - if true the 'from' date will have a data item
-    pub async fn get_temp_history(&self, from: DateTime<Utc>, to: DateTime<Utc>, ensure_from: bool) -> Result<Vec<DataItem<f64>>, WeatherError> {
+    pub async fn get_temp_history(&self, from: DateTime<Utc>, to: DateTime<Utc>, ensure_from: bool) -> Result<TemperatureData<f64>, WeatherError> {
         let url = format!("http://{}/temperature", self.host);
-        
+
         let req = self.client.get(&url)
             .query(&[("id", &self.sensor), ("from", &from.to_rfc3339()), ("to", &to.to_rfc3339())])
             .send().await?;
@@ -53,7 +53,7 @@ impl Weather {
         }
 
         let json = req.text().await?;
-        let weather_res: Vec<WeatherItem<f64>> = serde_json::from_str(&json)?;
+        let weather_res: Temperature<f64> = serde_json::from_str(&json)?;
         let from_date = if ensure_from {Some(from)} else {None};
         
         Ok(transform_history(weather_res, from_date, to))
@@ -95,25 +95,29 @@ impl Weather {
 /// * 'history' - the history data to transform
 /// * 'from' - optional from date to include with a data item
 /// * 'to' - to date to include with a data item
-fn transform_history<T: Copy>(history: Vec<WeatherItem<T>>, from: Option<DateTime<Utc>>, to: DateTime<Utc>) -> Vec<DataItem<T>> {
-    let mut result: Vec<DataItem<T>> = Vec::new();
+fn transform_history<T: Copy>(history: Temperature<T>, from: Option<DateTime<Utc>>, to: DateTime<Utc>) -> TemperatureData<T> {
+    let mut result = TemperatureData {
+        history: Vec::new(),
+        current_temp: history.current_temp,
+        perceived_temp: history.perceived_temp,
+    };
     
-    if history.len() == 0 {
+    if history.history.len() == 0 {
         result
     } else {
-        history.into_iter().for_each(|w| {result.push(DataItem{x: w.x, y: w.y});});
+        history.history.into_iter().for_each(|w| {result.history.push(DataItem{x: w.x, y: w.y});});
         
         if let Some(from) = from { 
-            if result[0].x != from {
-                    result.insert(0, DataItem{x: from, y: result[0].y});
+            if result.history[0].x != from {
+                    result.history.insert(0, DataItem{x: from, y: result.history[0].y});
             }
         }
 
-        let last = result.len() - 1;
-        if result[last].x != to {
-            result.push(DataItem{x: to, y: result[last].y});
+        let last = result.history.len() - 1;
+        if result.history[last].x != to {
+            result.history.push(DataItem{x: to, y: result.history[last].y});
         }
-        
+
         result
     }
 }

@@ -23,6 +23,12 @@ pub struct DataItem<T> {
     pub y: T,
 }
 
+pub struct TemperatureData<T> {
+    pub history: Vec<DataItem<T>>,
+    pub current_temp: Option<T>,
+    pub perceived_temp: Option<T>,
+}
+
 #[derive(Serialize, Clone)]
 pub struct Series<'a, T> {
     pub name: String,
@@ -42,6 +48,7 @@ pub struct WeatherData {
     pub temp_history: Vec<DataItem<f64>>,
     pub min_max: TwoDayMinMax,
     pub temp_current: f64,
+    pub temp_perceived: f64,
     pub last_end_time: DateTime<Utc>,
 }
 

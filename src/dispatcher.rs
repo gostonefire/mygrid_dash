@@ -162,6 +162,7 @@ impl Dispatcher {
                     today_max: 0.0,
                 },
                 temp_current: 0.0,
+                temp_perceived: 0.0,
                 last_end_time: Default::default(),
             },
             usage_policy: TariffColor::Green,
@@ -191,6 +192,7 @@ impl Dispatcher {
         struct SmallDashData<'a> {
             policy: TariffColor,
             temp_current: f64,
+            temp_perceived: f64,
             yesterday_min: f64,
             yesterday_max: f64,
             today_min: f64,
@@ -206,6 +208,7 @@ impl Dispatcher {
         let reply = SmallDashData {
             policy: self.usage_policy.clone(),
             temp_current: self.weather_data.temp_current,
+            temp_perceived: self.weather_data.temp_perceived,
             yesterday_min: self.weather_data.min_max.yesterday_min,
             yesterday_max: self.weather_data.min_max.yesterday_max,
             today_min: self.weather_data.min_max.today_min,
@@ -242,6 +245,7 @@ impl Dispatcher {
         struct FullDashData<'a> {
             policy: TariffColor,
             temp_current: f64,
+            temp_perceived: f64,
             yesterday_min: f64,
             yesterday_max: f64,
             today_min: f64,
@@ -259,6 +263,7 @@ impl Dispatcher {
         let reply = FullDashData {
             policy: self.usage_policy.clone(),
             temp_current: self.weather_data.temp_current,
+            temp_perceived: self.weather_data.temp_perceived,
             yesterday_min: self.weather_data.min_max.yesterday_min,
             yesterday_max: self.weather_data.min_max.yesterday_max,
             today_min: self.weather_data.min_max.today_min,
@@ -349,12 +354,10 @@ impl Dispatcher {
         info!("updating weather data");
 
         let history = self.weather.get_temp_history(today_start, utc_now, true).await?;
-        let last = history.len();
-        
-        self.weather_data.temp_history = history;
-        if last != 0 {
-            self.weather_data.temp_current = self.weather_data.temp_history[last - 1].y;
-        }
+
+        self.weather_data.temp_history = history.history;
+        self.weather_data.temp_current = history.current_temp.unwrap_or(0.0);
+        self.weather_data.temp_perceived = history.perceived_temp.unwrap_or(0.0);
 
 
         let (yesterday_min, yesterday_max) = self.weather.get_min_max(yesterday_start, yesterday_end).await?;

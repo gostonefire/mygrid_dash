@@ -12,3 +12,10 @@ pub struct MinMax<T> {
     pub min: T,
     pub max: T,
 }
+
+#[derive(Deserialize)]
+pub struct Temperature<T> {
+    pub history: Vec<WeatherItem<T>>,
+    pub current_temp: Option<T>,
+    pub perceived_temp: Option<T>,
+}
