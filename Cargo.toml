@@ -1,6 +1,6 @@
 [package]
 name = "mygrid_dash"
-version = "2.5.3"
+version = "2.5.4"
 edition = "2021"
 
 [dependencies]
@@ -11,12 +11,11 @@ actix-web = { version = "4", features = ["rustls-0_23"] }
 actix-files = "0.6"
 reqwest = "0.12"
 serde = { version = "1.0", features = ["derive"] }
-serde_with = { version = "3.16", features = ["chrono_0_4"] }
 serde_json = "1.0"
 toml = "0.9"
 log4rs = "1.4"
 log = "0.4"
-chrono = "0.4"
+chrono = {  version = "0.4", features = ["serde"] }
 md-5 = "0.10.6"
 glob = "0.3"
 uuid = {version = "1.19", features = ["v4"]}

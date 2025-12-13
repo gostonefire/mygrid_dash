@@ -1,7 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use crate::serialize_timestamp;
 
 #[derive(Serialize, PartialEq, Eq, Clone)]
 pub enum TariffColor {
@@ -18,7 +17,7 @@ pub struct DataPoint<T> {
 
 #[derive(Serialize, Clone)]
 pub struct DataItem<T> {
-    #[serde(with = "serialize_timestamp")]
+    #[serde(with = "chrono::serde::ts_milliseconds")]
     pub x: DateTime<Utc>,
     pub y: T,
 }

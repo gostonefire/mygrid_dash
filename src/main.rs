@@ -23,7 +23,6 @@ mod manager_fox_cloud;
 mod manager_mygrid;
 mod dispatcher;
 mod handlers;
-mod serialize_timestamp;
 mod models;
 mod usage_policy;
 mod manager_weather;
