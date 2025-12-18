@@ -1,17 +1,20 @@
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::str::FromStr;
 use std::sync::Arc;
+use axum::http::{header, HeaderValue};
+use axum::Router;
+use axum::routing::get;
+use axum_server::tls_rustls::RustlsConfig;
 use tokio::sync::{Mutex, RwLock};
-use actix_files::Files;
-use actix_web::{middleware, web, App, HttpServer};
 use chrono::Utc;
 use log::{error, info};
-use rustls::ServerConfig;
-use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use rustls_pki_types::pem::PemObject;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 use crate::errors::UnrecoverableError;
-use crate::initialization::{config, Google, WebServerParameters};
+use crate::initialization::{config, Google};
 use crate::dispatcher::{run, Cmd};
 use crate::handlers::*;
 use crate::manager_tokens::{google_base_data, Tokens};
@@ -30,19 +33,19 @@ mod manager_tokens;
 
 type SessionStore = Arc<RwLock<HashMap<String, (i64, String, Option<Tokens>)>>>;
 
-
 struct Comms {
     tx_to_mygrid: UnboundedSender<Cmd>,
     rx_from_mygrid: UnboundedReceiver<String>,
 }
 
+#[derive(Clone)]
 struct AppState {
     comms: Arc<Mutex<Comms>>,
     sessions: SessionStore,
     config: Arc<RwLock<Google>>,
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> Result<(), UnrecoverableError> {
     // Set up communication channels
     let (mut tx_to_mygrid, mut rx_from_web) = mpsc::unbounded_channel::<Cmd>();
@@ -70,25 +73,29 @@ async fn main() -> Result<(), UnrecoverableError> {
 
     // Web server
     info!("starting web server");
-    let web_comms = comms.clone();
-    let rustls_config = load_rustls_config(&config.web_server)?;
-    tokio::spawn(HttpServer::new(move || {
-            App::new()
-                .app_data(web::Data::new(AppState {comms: web_comms.clone(), sessions: session_store.clone(), config: google_config.clone() }))
-                .service(login)
-                .service(code)
-                .service(get_data)
-                .service(
-                    web::scope("")
-                        .wrap(middleware::DefaultHeaders::new().add(("Cache-Control", "no-cache")))
-                        .service(Files::new("/full", "./static").index_file("index_full.html"))
-                        .service(Files::new("/", "./static").index_file("index.html"))
-                )
-        })
-            .bind_rustls_0_23((config.web_server.bind_address.as_str(), config.web_server.bind_port), rustls_config)?
-            //.bind(("127.0.0.1", 8080))?
-            .disable_signals()
-            .run());
+    let static_service = ServeDir::new("static").append_index_html_on_directories(true);
+    let shared_state = AppState {comms: comms.clone(), sessions: session_store.clone(), config: google_config.clone() };
+
+    let app = Router::new()
+        .route("/data/{dash_type}", get(get_data))
+        .route("/login", get(login))
+        .route("/code", get(code))
+        .route_service("/full", ServeFile::new("static/index_full.html"))
+        .fallback_service(static_service)
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache"),
+        ))
+        .with_state(shared_state);
+
+    let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address).expect("invalid BIND_ADDR");
+    let addr = SocketAddr::new(IpAddr::V4(ip_addr), config.web_server.bind_port);
+
+    let rustls_config = RustlsConfig::from_pem_file(&config.web_server.tls_chain_cert, &config.web_server.tls_private_key)
+        .await?;
+
+    tokio::spawn(axum_server::bind_rustls(addr, rustls_config)
+                     .serve(app.into_make_service()));
 
     // Main dispatch function
     info!("starting main dispatch function");
@@ -104,29 +111,6 @@ async fn main() -> Result<(), UnrecoverableError> {
             disp_comms.rx_from_mygrid = rx_from_mygrid;
         }
     }
-}
-
-/// Loads TLS certificates
-///
-/// # Arguments
-///
-/// * 'config' - web server parameters
-fn load_rustls_config(config: &WebServerParameters) -> Result<ServerConfig, UnrecoverableError> {
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .unwrap();
-
-    // load TLS key/cert files
-    let cert_chain = CertificateDer::pem_file_iter(&config.tls_chain_cert)?
-        .flatten()
-        .collect();
-
-    let key_der =
-        PrivateKeyDer::from_pem_file(&config.tls_private_key).expect("Could not locate PKCS 8 private keys.");
-
-    Ok(ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(cert_chain, key_der)?)
 }
 
 /// Loop that purges old entries from the session store
