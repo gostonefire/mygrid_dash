@@ -98,6 +98,18 @@ function refreshData(forceRefresh) {
                 ]
             }
         });
+        tariffs_buy.updateOptions({
+            yaxis: {
+                min: 0,
+                max: resp.max_tariff,
+            }
+        });
+        tariffs_tomorrow.updateOptions({
+            yaxis: {
+                min: 0,
+                max: resp.max_tariff,
+            }
+        });
     });
 }
 

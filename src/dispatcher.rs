@@ -104,6 +104,7 @@ struct Dispatcher {
     real_time_data: RealTimeData,
     weather_data: WeatherData,
     tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
+    max_tariff: u8,
     usage_policy: TariffColor,
     last_request: i64,
     time_delta: TimeDelta,
@@ -181,6 +182,7 @@ impl Dispatcher {
                 last_end_time: Default::default(),
             },
             tomorrow_tariffs: None,
+            max_tariff: 0,
             usage_policy: TariffColor::Green,
             last_request: 0,
             time_delta,
@@ -216,6 +218,7 @@ impl Dispatcher {
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
             tariffs_buy_tomorrow: Option<Series<'a, DataItem<f64>>>,
+            max_tariff: u8,
             schedule: &'a Vec<Block>,
             base_cost: f64,
             schedule_cost: f64,
@@ -260,6 +263,7 @@ impl Dispatcher {
                 data: &self.mygrid_data.tariffs_buy,
             },
             tariffs_buy_tomorrow,
+            max_tariff: self.max_tariff,
             schedule: &self.schedule,
             base_cost: self.mygrid_data.base_cost,
             schedule_cost: self.mygrid_data.schedule_cost,
@@ -284,6 +288,7 @@ impl Dispatcher {
             current_prod_load: Series<'a, DataPoint<f64>>,
             current_soc_soh: Series<'a, DataPoint<u8>>,
             tariffs_buy: Series<'a, DataItem<f64>>,
+            max_tariff: u8,
             prod_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             load_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             cloud_diagram: Series<'a, DataItem<f64>>,
@@ -320,6 +325,7 @@ impl Dispatcher {
                 chart_type: String::new(),
                 data: &self.mygrid_data.tariffs_buy,
             },
+            max_tariff: self.max_tariff,
             prod_diagram: (
                 Series {
                     name: "Estimated Production".to_string(),
@@ -465,6 +471,8 @@ impl Dispatcher {
             self.tomorrow_tariffs = self.nordpool.get_tariffs(tomorrow_start, tomorrow_end, tomorrow_day_date).await?;
         }
 
+        self.max_tariff = self.max_tariff();
+
         Ok(())
     }
     
@@ -542,6 +550,30 @@ impl Dispatcher {
         }
         
         Ok(())
+    }
+
+    /// Calculates max tariff rounded up to the nearest even whole integer value, with a minimum
+    /// returned value of 6
+    ///
+    fn max_tariff(&self) -> u8 {
+        let max_today = self.mygrid_data.tariffs_buy
+            .iter()
+            .map(|d| d.y.ceil() as u8)
+            .max()
+            .unwrap_or(0);
+
+        let max_tomorrow = self.tomorrow_tariffs
+            .as_ref()
+            .map(|t| t.iter()
+                .map(|d| d.y.ceil() as u8)
+                .max()
+                .unwrap_or(0))
+            .unwrap_or(0);
+
+        let max = max_today.max(max_tomorrow).max(6);
+
+        // Round up to the nearest even whole integer by adding 1 and masking off the lowest bit
+        (max + 1) & !1
     }
 
     /// Returns utc now with any configured time delta applied

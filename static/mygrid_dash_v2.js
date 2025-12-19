@@ -67,6 +67,12 @@ function refreshData() {
                 ]
             }
         });
+        tariffs_buy.updateOptions({
+            yaxis: {
+                min: 0,
+                max: resp.max_tariff,
+            }
+        });
     });
 }
 
