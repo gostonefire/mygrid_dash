@@ -553,7 +553,7 @@ impl Dispatcher {
     }
 
     /// Calculates max tariff rounded up to the nearest even whole integer value, with a minimum
-    /// returned value of 6
+    /// returned value of 4
     ///
     fn max_tariff(&self) -> u8 {
         let max_today = self.mygrid_data.tariffs_buy
@@ -570,7 +570,7 @@ impl Dispatcher {
                 .unwrap_or(0))
             .unwrap_or(0);
 
-        let max = max_today.max(max_tomorrow).max(6);
+        let max = max_today.max(max_tomorrow).max(4);
 
         // Round up to the nearest even whole integer by adding 1 and masking off the lowest bit
         (max + 1) & !1
