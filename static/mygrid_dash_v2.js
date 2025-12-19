@@ -73,7 +73,7 @@ function refreshData() {
 loadScriptSequentially('locale_se.js')
     .then(() => loadScriptSequentially('mygrid_realtime.js'))
     .then(() => loadScriptSequentially('mygrid_soc_soh.js'))
-    .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
+    .then(() => loadScriptSequentially('mygrid_tariffs.js'))
     .then(() => loadScriptSequentially('mygrid_prod.js'))
     .then(() => loadScriptSequentially('mygrid_load.js'))
     .then(() => loadScriptSequentially('mygrid_cloud.js'))

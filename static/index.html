@@ -25,6 +25,10 @@
             margin-top: 8px;
             color: whitesmoke;
         }
+        .diagrams {
+            max-width: 800px;
+            flex-basis: 100%;
+        }
         #forecast {
             max-width: 800px;
             flex-basis: 100%;
@@ -70,9 +74,8 @@
             cursor: pointer;
 
         }
-        #tariffs-buy, #temperature, #schedule {
-            max-width: 800px;
-            flex-basis: 100%;
+        #tariffs-buy-tomorrow {
+            display: none;
         }
         #dim_screen
         {
@@ -120,9 +123,10 @@
             </div>
             <button type="button" id="pane-shift" onclick="window.location.replace('/full');">Full</button>
         </div>
-        <div id="temperature"></div>
-        <div id="tariffs-buy"></div>
-        <table id="schedule">
+        <div class="diagrams" id="temperature"></div>
+        <div class="diagrams" id="tariffs-buy"></div>
+        <div class="diagrams" id="tariffs-buy-tomorrow"></div>
+        <table class="diagrams" id="schedule">
             <caption style="padding-bottom: 5px"><b>Schedule</b></caption>
             <tr>
                 <td id="schedule-saving" colspan="8">Scheduling saves: --</td>
@@ -153,7 +157,7 @@
     </div>
     <div id="dim_screen" onclick="undimScreen()"></div>
 
-<script src="./mygrid_dash_essential_v2.js?v=2.6.0"></script>
+<script src="./mygrid_dash_essential_v2.js?v=2.6.1"></script>
 
 </body>
 </html>

@@ -30,6 +30,7 @@ mod models;
 mod usage_policy;
 mod manager_weather;
 mod manager_tokens;
+mod manager_nordpool;
 
 type SessionStore = Arc<RwLock<HashMap<String, (i64, String, Option<Tokens>)>>>;
 

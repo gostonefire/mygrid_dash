@@ -67,6 +67,19 @@ pub struct RealTimeData {
     pub load_data: VecDeque<f64>,
     pub timestamp: i64,
 }
+
+#[derive(Clone)]
+pub struct TariffFees {
+    pub variable_fee: f64,
+    pub spot_fee_percentage: f64,
+    pub energy_tax: f64,
+    pub swedish_power_grid: f64,
+    pub balance_responsibility: f64,
+    pub electric_certificate: f64,
+    pub guarantees_of_origin: f64,
+    pub fixed: f64,
+}
+
 pub struct MygridData {
     pub base_cost: f64,
     pub schedule_cost: f64,
@@ -76,5 +89,6 @@ pub struct MygridData {
     pub load: Vec<DataItem<f64>>,
     pub tariffs_buy: Vec<DataItem<f64>>,
     pub tariffs_sell: Vec<DataItem<f64>>,
+    pub tariff_fees: TariffFees,
     pub policy_tariffs: HashMap<DateTime<Utc>, f64>,
 }

@@ -3,7 +3,7 @@ use std::ops::Add;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use crate::manager_mygrid::errors::MyGridError;
 use crate::manager_mygrid::models::{BaseData, Block, SourceBlock};
-use crate::models::{DataItem, MygridData};
+use crate::models::{DataItem, MygridData, TariffFees};
 
 pub mod models;
 pub mod errors;
@@ -45,6 +45,16 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         load: Vec::new(),
         tariffs_buy: Vec::new(),
         tariffs_sell: Vec::new(),
+        tariff_fees: TariffFees {
+            variable_fee: 0.0,
+            spot_fee_percentage: 0.0,
+            energy_tax: 0.0,
+            swedish_power_grid: 0.0,
+            balance_responsibility: 0.0,
+            electric_certificate: 0.0,
+            guarantees_of_origin: 0.0,
+            fixed: 0.0,
+        },
         policy_tariffs: HashMap::new(),
     };
 
@@ -53,6 +63,14 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         let base_data: BaseData = serde_json::from_str(&json)?;
         mygrid.base_cost = base_data.base_cost;
         mygrid.schedule_cost = base_data.schedule_cost;
+        mygrid.tariff_fees.variable_fee = base_data.tariff_fees.variable_fee;
+        mygrid.tariff_fees.spot_fee_percentage = base_data.tariff_fees.spot_fee_percentage;
+        mygrid.tariff_fees.energy_tax = base_data.tariff_fees.energy_tax;
+        mygrid.tariff_fees.swedish_power_grid = base_data.tariff_fees.swedish_power_grid;
+        mygrid.tariff_fees.balance_responsibility = base_data.tariff_fees.balance_responsibility;
+        mygrid.tariff_fees.electric_certificate = base_data.tariff_fees.electric_certificate;
+        mygrid.tariff_fees.guarantees_of_origin = base_data.tariff_fees.guarantees_of_origin;
+        mygrid.tariff_fees.fixed = base_data.tariff_fees.fixed;
 
         for d in base_data.forecast {
             mygrid.forecast_temp.push(DataItem { x: d.date_time, y: d.temp });

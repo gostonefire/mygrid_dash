@@ -1,9 +1,9 @@
-// tariffs buy
+// tariffs buy tomorrow
 //
-let tariffs_buy_options= {
+let tariffs_tomorrow_options= {
     series: [],
     chart: {
-        height: 350,
+        height: 200,
         type: 'bar',
         toolbar: {
             show: false,
@@ -32,7 +32,7 @@ let tariffs_buy_options= {
     },
     yaxis: {
         min: 0,
-        max: 10,
+        max: 8,
         axisBorder: {
             show: false
         },
@@ -64,7 +64,7 @@ let tariffs_buy_options= {
         enabled: false,
     },
     title: {
-        text: 'Tariffs Buy',
+        text: 'Tariffs Tomorrow',
         floating: true,
         offsetY: 0,
         align: 'center',
@@ -85,5 +85,5 @@ let tariffs_buy_options= {
 };
 
 
-let tariffs_buy = new ApexCharts(document.querySelector("#tariffs-buy"), tariffs_buy_options);
-tariffs_buy.render();
+let tariffs_tomorrow = new ApexCharts(document.querySelector("#tariffs-buy-tomorrow"), tariffs_tomorrow_options);
+tariffs_tomorrow.render();

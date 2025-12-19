@@ -53,6 +53,12 @@ function refreshData(forceRefresh) {
 
         temp.updateSeries(resp.temp_diagram);
         tariffs_buy.updateSeries([resp.tariffs_buy]);
+        if (resp.tariffs_buy_tomorrow != null) {
+            $("#tariffs-buy-tomorrow").show();
+            tariffs_tomorrow.updateSeries([resp.tariffs_buy_tomorrow]);
+        } else {
+            $("#tariffs-buy-tomorrow").hide();
+        }
 
         $("#schedule-saving").text("Scheduling saves: " + (resp.base_cost - resp.schedule_cost).toFixed(2));
         let schedule_body = $('#schedule-body');
@@ -110,7 +116,8 @@ function undimScreen() {
 
 loadScriptSequentially('locale_se.js')
     .then(() => loadScriptSequentially('mygrid_temp.js'))
-    .then(() => loadScriptSequentially('mygrid_tariffs_buy.js'))
+    .then(() => loadScriptSequentially('mygrid_tariffs.js'))
+    .then(() => loadScriptSequentially('mygrid_tariffs_tomorrow.js'))
     .then(() => {
         refreshData(true);
         timer = setInterval(() => {

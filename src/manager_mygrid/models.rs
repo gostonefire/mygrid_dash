@@ -36,6 +36,21 @@ pub struct TariffValues {
 }
 
 #[derive(Deserialize)]
+pub struct TariffFees {
+    // Power grid fees (öre/kWh, exl. VAT)
+    pub variable_fee: f64,
+    pub spot_fee_percentage: f64,
+    pub energy_tax: f64,
+
+    // Electricity trading fees  (öre/kWh, exl. VAT)
+    pub swedish_power_grid: f64,
+    pub balance_responsibility: f64,
+    pub electric_certificate: f64,
+    pub guarantees_of_origin: f64,
+    pub fixed: f64,
+}
+
+#[derive(Deserialize)]
 pub struct BaseData {
     pub base_cost: f64,
     pub schedule_cost: f64,
@@ -43,6 +58,7 @@ pub struct BaseData {
     pub production: Vec<ProductionValues>,
     pub consumption: Vec<ConsumptionValues>,
     pub tariffs: Vec<TariffValues>,
+    pub tariff_fees: TariffFees,
 }
 
 /// Available block types

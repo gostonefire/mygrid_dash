@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::ops::Add;
-use chrono::{DateTime, Duration, DurationRound, Local, TimeDelta, Timelike, Utc};
+use chrono::{DateTime, Duration, DurationRound, Local, NaiveDate, TimeDelta, Timelike, Utc};
 use log::{error, info};
 use serde::Serialize;
 use tokio::select;
@@ -10,8 +10,9 @@ use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
+use crate::manager_nordpool::NordPool;
 use crate::manager_weather::Weather;
-use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TwoDayMinMax, WeatherData};
+use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TariffFees, TwoDayMinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
 pub enum Cmd {
@@ -96,11 +97,13 @@ struct Dispatcher {
     mygrid_data: MygridData,
     fox_cloud: Fox,
     weather: Weather,
+    nordpool: NordPool,
     schedule_path: String,
     base_data_path: String,
     history_data: HistoryData,
     real_time_data: RealTimeData,
     weather_data: WeatherData,
+    tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
     usage_policy: TariffColor,
     last_request: i64,
     time_delta: TimeDelta,
@@ -115,6 +118,7 @@ impl Dispatcher {
     async fn new(config: &Config) -> Result<Self, DispatcherError> {
         let fox_cloud = Fox::new(&config.fox_ess)?;
         let weather = Weather::new(&config.weather.host, &config.weather.sensor)?;
+        let nordpool = NordPool::new()?;
         let time_delta = if let Some(debug_run_time) = config.general.debug_run_time {
             Utc::now() - debug_run_time.with_timezone(&Utc)
         } else {
@@ -132,10 +136,21 @@ impl Dispatcher {
                 load: Vec::new(),
                 tariffs_buy: Vec::new(),
                 tariffs_sell: Vec::new(),
+                tariff_fees: TariffFees {
+                    variable_fee: 0.0,
+                    spot_fee_percentage: 0.0,
+                    energy_tax: 0.0,
+                    swedish_power_grid: 0.0,
+                    balance_responsibility: 0.0,
+                    electric_certificate: 0.0,
+                    guarantees_of_origin: 0.0,
+                    fixed: 0.0,
+                },
                 policy_tariffs: HashMap::new(),
             },
             fox_cloud,
             weather,
+            nordpool,
             schedule_path: config.mygrid.schedule_path.clone(),
             base_data_path: config.mygrid.base_data_path.clone(),
             history_data: HistoryData {
@@ -165,6 +180,7 @@ impl Dispatcher {
                 temp_perceived: 0.0,
                 last_end_time: Default::default(),
             },
+            tomorrow_tariffs: None,
             usage_policy: TariffColor::Green,
             last_request: 0,
             time_delta,
@@ -199,11 +215,24 @@ impl Dispatcher {
             today_max: f64,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
+            tariffs_buy_tomorrow: Option<Series<'a, DataItem<f64>>>,
             schedule: &'a Vec<Block>,
             base_cost: f64,
             schedule_cost: f64,
             time_delta: i64,
         }
+
+        let tariffs_buy_tomorrow = if let Some(tariffs) = &self.tomorrow_tariffs {
+            Some(
+                Series {
+                    name: "Tariffs".to_string(),
+                    chart_type: String::new(),
+                    data: tariffs,
+                }
+            )
+        } else {
+            None
+        };
         
         let reply = SmallDashData {
             policy: self.usage_policy.clone(),
@@ -226,15 +255,17 @@ impl Dispatcher {
                 },
             ),
             tariffs_buy: Series {
-                name: "Tariffs Buy".to_string(),
+                name: "Tariffs".to_string(),
                 chart_type: String::new(),
                 data: &self.mygrid_data.tariffs_buy,
             },
+            tariffs_buy_tomorrow,
             schedule: &self.schedule,
             base_cost: self.mygrid_data.base_cost,
             schedule_cost: self.mygrid_data.schedule_cost,
             time_delta: self.time_delta.num_milliseconds(),
         };
+
         Ok(serde_json::to_string_pretty(&reply)?)
     }
 
@@ -341,8 +372,8 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     async fn update_weather(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
-        let (today_start, today_end) = get_utc_day_start(utc_now, 0);
-        let (yesterday_start, yesterday_end) = get_utc_day_start(utc_now, -1);
+        let (today_start, today_end, _) = get_utc_day_start(utc_now, 0);
+        let (yesterday_start, yesterday_end, _) = get_utc_day_start(utc_now, -1);
 
         // Check if update is needed
         if self.weather_data.last_end_time >= today_start &&  self.weather_data.last_end_time < today_end  &&
@@ -376,7 +407,7 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     async fn update_history(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
-        let (today_start, today_end) = get_utc_day_start(utc_now, 0);
+        let (today_start, today_end, _) = get_utc_day_start(utc_now, 0);
 
         // Check if update is needed
         if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end &&
@@ -414,18 +445,26 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Updates with data from mygrid base data and schedule
-    /// 
-    /// Base data from mygrid starts with current hour, so the update routine only updates 
-    /// current hour and onward to keep an entire day in stock.
+    /// Updates with data from mygrid base data, schedule, and tomorrow's tariffs.
     ///
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
         self.schedule =  get_schedule(&self.schedule_path).await?;
 
-        let (today_start, _) = get_utc_day_start(self.utc_now(), 0);
+        let (today_start, _, _) = get_utc_day_start(self.utc_now(), 0);
 
         self.mygrid_data = get_base_data(&self.base_data_path, today_start).await?;
-            
+        self.nordpool.set_tariff_fees(self.mygrid_data.tariff_fees.clone());
+
+        let (tomorrow_start, tomorrow_end, tomorrow_day_date) = get_utc_day_start(self.utc_now(), 1);
+        if self.tomorrow_tariffs.is_none() || self.tomorrow_tariffs
+            .as_ref()
+            .is_some_and(|t| t.first()
+                .is_some_and(|d| d.x != tomorrow_start) || t.first().is_none()
+            ) {
+            info!("updating tomorrow's tariffs");
+            self.tomorrow_tariffs = self.nordpool.get_tariffs(tomorrow_start, tomorrow_end, tomorrow_day_date).await?;
+        }
+
         Ok(())
     }
     
@@ -546,11 +585,13 @@ fn two_decimals(a: f64) -> f64 {
 /// For DST switch days (summer to winter time and vice versa), the length of the day
 /// will be either 23 hours (in the spring) or 25 hours (in the autumn).
 ///
+/// It also returns the day date for convenience as a third value in the return tuple
+///
 /// # Arguments
 ///
 /// * 'date_time' - date time to get utc day start and end for (in relation to Local timezone)
 /// * 'day_index' - 0-based index of the day, 0 is today, -1 is yesterday, etc.
-fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>, DateTime<Utc>) {
+fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>, DateTime<Utc>, NaiveDate) {
     // First, go local and move hour to a safe place regarding DST day shift between summer and winter time.
     // Also, apply the day index to get to the desired day.
     let date = date_time.with_timezone(&Local).with_hour(12).unwrap().add(TimeDelta::days(day_index));
@@ -561,6 +602,6 @@ fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>
     // Then add one day and do the same as for start
     let end = date.add(TimeDelta::days(1)).duration_trunc(TimeDelta::hours(1)).unwrap().with_hour(0).unwrap();
 
-    (start.with_timezone(&Utc), end.with_timezone(&Utc))
+    (start.with_timezone(&Utc), end.with_timezone(&Utc), date.date_naive())
 }
 

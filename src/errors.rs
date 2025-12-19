@@ -4,6 +4,7 @@ use log4rs::config::runtime::ConfigErrors;
 use log::SetLoggerError;
 use crate::manager_fox_cloud::errors::FoxError;
 use crate::manager_mygrid::errors::MyGridError;
+use crate::manager_nordpool::NordPoolError;
 use crate::manager_weather::errors::WeatherError;
 
 /// Error representing an unrecoverable error that will halt the application
@@ -90,5 +91,8 @@ impl From<serde_json::Error> for DispatcherError {
 }
 impl From<WeatherError> for DispatcherError {
     fn from(e: WeatherError) -> Self { DispatcherError(e.to_string()) }
+}
+impl From<NordPoolError> for DispatcherError {
+    fn from(e: NordPoolError) -> Self { DispatcherError(e.to_string()) }
 }
 
