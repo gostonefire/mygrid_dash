@@ -51,7 +51,8 @@ impl NordPool {
     /// # Arguments
     /// 
     /// * 'tariff_fees' - the fees
-    pub fn set_tariff_fees(&mut self, tariff_fees: TariffFees) {
+    pub fn set_tariff_fees(&mut self, mut tariff_fees: TariffFees) {
+        tariff_fees.spot_fee_percentage /= 100.0;
         self.tariff_fees = Some(tariff_fees);
     }
     
