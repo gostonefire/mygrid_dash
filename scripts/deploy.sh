@@ -89,7 +89,7 @@ run_as_user() {
 }
 
 ########## From here the script will be run as root, so add any commands such as systemctl etc. from here ##########
-if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+if systemctl is-active --quiet "$SERVICE_NAME"; then
   systemctl stop --quiet "$SERVICE_NAME"
 fi
 ########## until to here! ##########################################################################################
@@ -113,7 +113,7 @@ fi
 
 systemctl daemon-reload
 
-if systemctl is-enabled --quiet "$SERVICE_NAME"; then
+if ! systemctl is-enabled --quiet "$SERVICE_NAME"; then
   systemctl enable "$SERVICE_NAME" >> "$SUB_SCRIPT_LOG" 2>&1
   EXIT_CODE=$?
   if [ $EXIT_CODE -ne 0 ]; then
