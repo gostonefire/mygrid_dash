@@ -1,6 +1,6 @@
 [package]
 name = "mygrid_dash"
-version = "2.6.7"
+version = "2.6.8"
 edition = "2021"
 
 [dependencies]
@@ -8,11 +8,11 @@ axum = "0.8"
 axum-extra = { version = "0.12", features = ["cookie"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 tower-http = { version = "0.6", features = ["fs", "set-header"] }
-tokio = { version = "1.48", features = ["rt-multi-thread"] }
-reqwest = "0.12"
+tokio = { version = "1.49", features = ["rt-multi-thread"] }
+reqwest = { version = "0.13", features = ["query", "form"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.9.8"
+toml = "0.9"
 log4rs = "1.4"
 log = "0.4"
 chrono = {  version = "0.4", features = ["serde"] }
