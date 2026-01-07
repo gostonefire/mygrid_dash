@@ -1,3 +1,5 @@
+extern crate alloc;
+
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;

@@ -1,4 +1,5 @@
 use std::{env, fs};
+use std::path::PathBuf;
 use chrono::{DateTime, Local};
 use jsonwebtoken::jwk::JwkSet;
 use log::LevelFilter;
@@ -9,7 +10,9 @@ use crate::logging::setup_logger;
 #[derive(Deserialize, Clone)]
 pub struct Google {
     pub redirect_uri: String,
+    #[serde(default)]
     pub client_id: String,
+    #[serde(default)]
     pub client_secret: String,
     pub scope: String,
     #[serde(default)]
@@ -24,6 +27,7 @@ pub struct Google {
     pub well_known: String,
     #[serde(default)]
     pub well_known_expire: i64,
+    #[serde(default)]
     pub users: Vec<String>,
 }
 
@@ -37,7 +41,9 @@ pub struct WebServerParameters {
 
 #[derive(Deserialize, Clone)]
 pub struct FoxESS {
+    #[serde(default)]
     pub api_key: String,
+    #[serde(default)]
     pub inverter_sn: String,
 }
 
@@ -83,7 +89,15 @@ pub fn config() -> Result<Config, ConfigError> {
         .ok_or(ConfigError::from("invalid --config=<config_path>"))?
         .1;
     
-    let config = load_config(&config_path)?;
+    let mut config = load_config(&config_path)?;
+    config.google.client_id = read_credential("google_client_id")?;
+    config.google.client_secret = read_credential("google_client_secret")?;
+    config.fox_ess.api_key = read_credential("fox_ess_api_key")?;
+    config.fox_ess.inverter_sn = read_credential("fox_ess_inverter_sn")?;
+    config.google.users = read_credential("google_users")?
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect::<Vec<String>>();
 
     setup_logger(&config.general.log_path, config.general.log_level, config.general.log_to_stdout)?;
 
@@ -101,4 +115,18 @@ fn load_config(config_path: &str) -> Result<Config, ConfigError> {
     let config: Config = toml::from_str(&toml)?;
 
     Ok(config)
+}
+
+/// Reads a credential from the file system supported by the credstore and
+/// given from systemd
+///
+/// # Arguments
+///
+/// * 'name' - name of the credential to read
+fn read_credential(name: &str) -> Result<String, ConfigError> {
+    let dir = env::var("CREDENTIALS_DIRECTORY")?;
+    let mut p = PathBuf::from(dir);
+    p.push(name);
+    let bytes = fs::read(p)?;
+    Ok(String::from_utf8(bytes)?.trim_end().to_string())
 }

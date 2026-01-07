@@ -11,6 +11,12 @@ Restart=always
 RestartSec=30
 User=root
 
+LoadCredential=google_client_id:/etc/credstore/google_client_id
+LoadCredential=google_client_secret:/etc/credstore/google_client_secret
+LoadCredential=fox_ess_api_key:/etc/credstore/fox_ess_api_key
+LoadCredential=fox_ess_inverter_sn:/etc/credstore/fox_ess_inverter_sn
+
+
 [Install]
 WantedBy=multi-user.target
 

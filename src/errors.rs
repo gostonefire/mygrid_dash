@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
+use std::string::String;
 use log4rs::config::runtime::ConfigErrors;
 use log::SetLoggerError;
 use crate::manager_fox_cloud::errors::FoxError;
@@ -58,6 +59,12 @@ impl From<ConfigErrors> for ConfigError {
 }
 impl From<&str> for ConfigError {
     fn from(e: &str) -> Self { ConfigError(e.to_string()) }
+}
+impl From<std::env::VarError> for ConfigError {
+    fn from(e: std::env::VarError) -> Self { ConfigError(e.to_string()) }
+}
+impl From<alloc::string::FromUtf8Error> for ConfigError {
+    fn from(e: alloc::string::FromUtf8Error) -> Self { ConfigError(e.to_string()) }
 }
 
 pub struct DispatcherError(pub String);

@@ -1,0 +1,26 @@
+[google]
+redirect_uri      = "https://dash.gridfire.org/code"
+scope             = "openid email"
+well_known        = "https://accounts.google.com/.well-known/openid-configuration"
+
+[web_server]
+bind_address      = "192.168.1.136"
+bind_port         = 8085
+tls_private_key   = "/etc/letsencrypt/live/gridfire.org-0001/privkey.pem"
+tls_chain_cert    = "/etc/letsencrypt/live/gridfire.org-0001/fullchain.pem"
+
+[fox_ess]
+
+[mygrid]
+schedule_path     = "/home/petste/MyGridScheduler/schedule/schedule.json"     # path to the schedule file
+base_data_path    = "/home/petste/MyGridScheduler/base_data/"                 # path to the library where base date files is to be found
+
+[weather]
+host              = "mygrid.gridfire.org:8081"
+sensor            = "east_west"
+
+[general]
+# debug_run_time    = "2025-10-26T02:59:00+02:00"
+log_path          = "/home/petste/MyGridDash/logs/mygrid_dash.log"
+log_level         = "Warn"
+log_to_stdout     = false
