@@ -9,7 +9,7 @@ StandardOutput=inherit
 StandardError=inherit
 Restart=always
 RestartSec=30
-User=root
+User=petste
 
 LoadCredential=google_client_id:/etc/credstore/google_client_id
 LoadCredential=google_client_secret:/etc/credstore/google_client_secret

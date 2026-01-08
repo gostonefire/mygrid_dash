@@ -6,8 +6,6 @@ well_known        = "https://accounts.google.com/.well-known/openid-configuratio
 [web_server]
 bind_address      = "192.168.1.136"
 bind_port         = 8085
-tls_private_key   = "/etc/letsencrypt/live/gridfire.org-0001/privkey.pem"
-tls_chain_cert    = "/etc/letsencrypt/live/gridfire.org-0001/fullchain.pem"
 
 [fox_ess]
 
