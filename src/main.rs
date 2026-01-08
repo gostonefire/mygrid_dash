@@ -7,7 +7,6 @@ use std::sync::Arc;
 use axum::http::{header, HeaderValue};
 use axum::Router;
 use axum::routing::get;
-use axum_server::tls_rustls::RustlsConfig;
 use tokio::sync::{Mutex, RwLock};
 use chrono::Utc;
 use log::{error, info};
@@ -94,17 +93,8 @@ async fn main() -> Result<(), UnrecoverableError> {
     let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address).expect("invalid BIND_ADDR");
     let addr = SocketAddr::new(IpAddr::V4(ip_addr), config.web_server.bind_port);
 
-    if config.web_server.bind_port == 443 {
-        let rustls_config = RustlsConfig::from_pem_file(&config.web_server.tls_chain_cert, &config.web_server.tls_private_key)
-            .await?;
-
-        tokio::spawn(axum_server::bind_rustls(addr, rustls_config)
-            .serve(app.into_make_service()));
-    } else {
-        tokio::spawn(axum_server::bind(addr)
-            .serve(app.into_make_service()));
-    }
-
+    tokio::spawn(axum_server::bind(addr)
+        .serve(app.into_make_service()));
 
     // Main dispatch function
     info!("starting main dispatch function");

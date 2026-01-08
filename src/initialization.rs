@@ -35,8 +35,6 @@ pub struct Google {
 pub struct WebServerParameters {
     pub bind_address: String,
     pub bind_port: u16,
-    pub tls_private_key: String,
-    pub tls_chain_cert: String,
 }
 
 #[derive(Deserialize, Clone)]
