@@ -1,22 +1,78 @@
 [Unit]
 Description=Dash for MyGrid
 After=network-online.target
+Wants=network-online.target
 
 [Service]
+Type=simple
+User=petste
+WorkingDirectory=/home/petste/MyGridDash
 ExecStart=/bin/bash /home/petste/MyGridDash/start.sh
-WorkingDirectory=/home/petste/MyGridDash/
-StandardOutput=inherit
-StandardError=inherit
 Restart=always
 RestartSec=30
-User=petste
 
+# Credentials (good approach)
 LoadCredential=google_client_id:/etc/credstore/google_client_id
 LoadCredential=google_client_secret:/etc/credstore/google_client_secret
 LoadCredential=google_users:/etc/credstore/google_users
 LoadCredential=fox_ess_api_key:/etc/credstore/fox_ess_api_key
 LoadCredential=fox_ess_inverter_sn:/etc/credstore/fox_ess_inverter_sn
 
+# --- Filesystem hardening ---
+# Make the whole filesystem read-only by default, then poke holes only where needed
+ProtectSystem=strict
+ProtectHome=read-only
+
+# Only allow writes to logs (and to /run for transient files if needed)
+ReadWritePaths=/home/petste/MyGridDash/logs
+
+# Explicitly allow read access to required paths (not strictly required with ProtectHome=read-only,
+# but it documents intent and helps if you tighten further later)
+ReadOnlyPaths=/home/petste/MyGridDash
+ReadOnlyPaths=/home/petste/MyGridScheduler/base_data
+ReadOnlyPaths=/home/petste/MyGridScheduler/schedule
+
+# Optional: if the service never needs to touch other parts of /home, you can block them:
+# InaccessiblePaths=/home
+
+# Create a private /tmp for the service
+PrivateTmp=yes
+
+# Tighten default file permissions for anything it creates
+UMask=0077
+
+# --- Privilege hardening ---
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+
+# If your app doesn't need any Linux capabilities (most user-space apps don't):
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# --- Kernel / namespace hardening ---
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+
+# Hide other processes where possible
+ProtectProc=invisible
+ProcSubset=pid
+
+# Reduce device access (usually safe for web/app servers)
+PrivateDevices=yes
+
+# --- Networking hardening ---
+# Limit to normal internet + UNIX sockets (adjust if you need Bluetooth, raw sockets, etc.)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# --- Syscall hardening (start conservative) ---
+SystemCallArchitectures=native
+# A reasonable first step that often works; if it breaks, loosen gradually
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
 [Install]
 WantedBy=multi-user.target
-
