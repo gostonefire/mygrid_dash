@@ -521,9 +521,17 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+        let is_discharging = self.schedule
+            .iter()
+            .filter(|block| block.start_time <= utc_now && block.end_time > utc_now)
+            .last()
+            .map(|b| self.real_time_data.soc > (b.soc_out + 2) as u8) // +2 since battery may stop discharge early
+            .unwrap_or(false);
+
         self.usage_policy = get_policy(
             utc_now.duration_trunc(TimeDelta::minutes(15))?, 
-            self.real_time_data.soc, 
+            self.real_time_data.soc,
+            is_discharging,
             &self.mygrid_data.policy_tariffs,
         );
         

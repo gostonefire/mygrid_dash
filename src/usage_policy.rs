@@ -8,14 +8,17 @@ use crate::models::TariffColor;
 ///
 /// # Arguments
 /// 
-/// * 'data' - a struct containing all necessary data to evaluate policy
-pub fn get_policy(date_time: DateTime<Utc>, soc: u8, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
+/// * 'date_time' - current UTC date time
+/// * 'soc' - current state of charge
+/// * 'is_discharging' - whether the battery is currently discharging
+/// * 'tariffs' - hourly buy tariffs
+pub fn get_policy(date_time: DateTime<Utc>, soc: u8, is_discharging: bool, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
     let now_color = tariff_color_now(date_time, tariffs);
     let soc_ok = soc > 25;
 
-    if now_color == TariffColor::Yellow && soc_ok {
+    if now_color == TariffColor::Yellow && soc_ok && is_discharging {
         TariffColor::Green
-    } else if now_color == TariffColor::Red && soc_ok {
+    } else if now_color == TariffColor::Red && soc_ok && is_discharging {
         TariffColor::Yellow
     } else {
         now_color

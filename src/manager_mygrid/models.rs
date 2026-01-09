@@ -112,6 +112,10 @@ pub struct Block {
     pub status: String,
     #[serde(default)]
     pub start: String,
+    #[serde(skip)]
+    pub start_time: DateTime<Utc>,
+    #[serde(skip)]
+    pub end_time: DateTime<Utc>,
     #[serde(default)]
     pub length: String,
 }

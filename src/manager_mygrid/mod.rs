@@ -123,6 +123,8 @@ fn transform_source_block(block: &SourceBlock) -> Block {
         soc_out: block.soc_out,
         status: block.status.to_string(),
         start: block.start_time.with_timezone(&Local).format("%H:%M").to_string(),
+        start_time: block.start_time,
+        end_time: block.end_time.add(TimeDelta::minutes(BLOCK_UNIT_SIZE)),
         length: format!("{:02}:{:02}", length.num_hours(), length.num_minutes() - length.num_hours() * 60),
     }
 }
