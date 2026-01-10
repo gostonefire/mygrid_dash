@@ -11,12 +11,15 @@ use crate::models::TariffColor;
 /// * 'date_time' - current UTC date time
 /// * 'soc' - current state of charge
 /// * 'is_discharging' - whether the battery is currently discharging
+/// * 'charge_price' - the last average charge price, if any.
 /// * 'tariffs' - hourly buy tariffs
-pub fn get_policy(date_time: DateTime<Utc>, soc: u8, is_discharging: bool, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
+pub fn get_policy(date_time: DateTime<Utc>, soc: u8, is_discharging: bool, charge_price: Option<f64>, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
     let now_color = tariff_color_now(date_time, tariffs);
     let soc_ok = soc > 25;
 
-    if now_color == TariffColor::Yellow && soc_ok && is_discharging {
+    if is_discharging && charge_price.is_some() {
+        cost_to_color(charge_price)
+    } else if now_color == TariffColor::Yellow && soc_ok && is_discharging {
         TariffColor::Green
     } else if now_color == TariffColor::Red && soc_ok && is_discharging {
         TariffColor::Yellow
