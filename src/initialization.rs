@@ -63,6 +63,8 @@ pub struct General {
     pub log_path: String,
     pub log_level: LevelFilter,
     pub log_to_stdout: bool,
+    #[serde(default)]
+    pub version: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -88,6 +90,7 @@ pub fn config() -> Result<Config, ConfigError> {
         .1;
     
     let mut config = load_config(&config_path)?;
+    config.general.version = env!("CARGO_PKG_VERSION").to_string();
     config.google.client_id = read_credential("google_client_id")?;
     config.google.client_secret = read_credential("google_client_secret")?;
     config.fox_ess.api_key = read_credential("fox_ess_api_key")?;

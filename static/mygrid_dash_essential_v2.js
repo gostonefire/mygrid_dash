@@ -76,6 +76,8 @@ function refreshData(forceRefresh) {
                 true_soc_in + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
 
+        $("#version").text("Version: " + resp.version);
+        
         let datetime = new Date();
         let coeff = 1000 * 60 * 15;
         let datetime_quarters = new Date(Math.floor((datetime.getTime() - resp.time_delta) / coeff) * coeff);

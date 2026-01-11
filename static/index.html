@@ -101,6 +101,13 @@
             padding-bottom: 2px;
             color: whitesmoke;
         }
+        .info-text {
+            display: flex;
+            flex-flow: row;
+            justify-content: right;
+            font-size: small;
+            color: gainsboro;
+        }
     </style>
 
     <script src="./apexcharts.js"></script>
@@ -154,6 +161,7 @@
                 </tr>
             </tbody>
         </table>
+        <p id="version" class="info-text">Version: --</p>
     </div>
     <div id="dim_screen" onclick="undimScreen()"></div>
 

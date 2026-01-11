@@ -108,6 +108,7 @@ struct Dispatcher {
     usage_policy: TariffColor,
     last_request: i64,
     time_delta: TimeDelta,
+    version: String,
 }
 
 impl Dispatcher {
@@ -186,6 +187,7 @@ impl Dispatcher {
             usage_policy: TariffColor::Green,
             last_request: 0,
             time_delta,
+            version: config.general.version.clone(),
         })
     }
 
@@ -223,6 +225,7 @@ impl Dispatcher {
             base_cost: f64,
             schedule_cost: f64,
             time_delta: i64,
+            version: &'a String,
         }
 
         let tariffs_buy_tomorrow = if let Some(tariffs) = &self.tomorrow_tariffs {
@@ -268,6 +271,7 @@ impl Dispatcher {
             base_cost: self.mygrid_data.base_cost,
             schedule_cost: self.mygrid_data.schedule_cost,
             time_delta: self.time_delta.num_milliseconds(),
+            version: &self.version,
         };
 
         Ok(serde_json::to_string_pretty(&reply)?)

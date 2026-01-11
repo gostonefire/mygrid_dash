@@ -60,7 +60,7 @@ async fn main() -> Result<(), UnrecoverableError> {
     let session_store: SessionStore = Arc::new(RwLock::new(HashMap::new()));
 
     // Print version
-    info!("mygrid_dash version: {}", env!("CARGO_PKG_VERSION"));
+    info!("mygrid_dash version: {}", config.general.version);
 
     // Enrich config
     google_base_data(google_config.clone()).await.expect("google base data update should succeed");
