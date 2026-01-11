@@ -1,5 +1,4 @@
 use std::collections::{HashMap, VecDeque};
-use std::iter::successors;
 use std::ops::Add;
 use chrono::{DateTime, Duration, DurationRound, Local, NaiveDate, TimeDelta, Timelike, Utc};
 use log::{error, info};
@@ -10,7 +9,7 @@ use crate::errors::DispatcherError;
 use crate::initialization::Config;
 use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
-use crate::manager_mygrid::models::{Block, BlockType};
+use crate::manager_mygrid::models::Block;
 use crate::manager_nordpool::NordPool;
 use crate::manager_weather::Weather;
 use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TariffFees, TwoDayMinMax, WeatherData};
@@ -522,37 +521,11 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
-        let is_discharging = self.schedule
-            .iter()
-            .filter(|block| block.start_time <= utc_now && block.end_time > utc_now)
-            .last()
-            .map(|b| self.real_time_data.soc > (b.soc_out + 2) as u8) // +2 since battery may stop discharge early
-            .unwrap_or(false);
-
-        let last_charge_time = self.schedule
-            .iter()
-            .filter(|b| b.block_type == BlockType::Charge && utc_now > b.end_time)
-            .last()
-            .map(|b| (b.start_time, b.end_time));
-
-        let charge_price: Option<f64> = last_charge_time.map(|(start, end)| {
-            let mut intervals = 0;
-            let total_price: f64 = successors(Some(start), |&t| {
-                let next = t + TimeDelta::minutes(15);
-                (next < end).then_some(next)
-            })
-                .inspect(|_| intervals += 1)
-                .map(|t| self.mygrid_data.policy_tariffs.get(&t).copied().unwrap_or(0.0))
-                .sum();
-
-            total_price / intervals as f64
-        });
 
         self.usage_policy = get_policy(
             utc_now.duration_trunc(TimeDelta::minutes(15))?, 
             self.real_time_data.soc,
-            is_discharging,
-            charge_price,
+            &self.schedule,
             &self.mygrid_data.policy_tariffs,
         );
         

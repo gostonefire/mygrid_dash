@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::iter::successors;
 use std::ops::Add;
 use chrono::{DateTime, TimeDelta, Utc};
+use crate::manager_mygrid::models::{Block, BlockType};
 use crate::models::TariffColor;
 
 
@@ -10,19 +12,50 @@ use crate::models::TariffColor;
 /// 
 /// * 'date_time' - current UTC date time
 /// * 'soc' - current state of charge
-/// * 'is_discharging' - whether the battery is currently discharging
-/// * 'charge_price' - the last average charge price, if any.
+/// * 'schedule' - schedule of the day, used to determine if the battery is discharging or not
 /// * 'tariffs' - hourly buy tariffs
-pub fn get_policy(date_time: DateTime<Utc>, soc: u8, is_discharging: bool, charge_price: Option<f64>, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
-    let now_color = tariff_color_now(date_time, tariffs);
-    let soc_ok = soc > 25;
+pub fn get_policy(date_time: DateTime<Utc>, soc: u8, schedule: &Vec<Block>, tariffs: &HashMap<DateTime<Utc>, f64>) -> TariffColor {
+    // Checks if we are currently discharging from the battery, with a margin of 15%.
+    // The margin is used so that we are not displaying a policy of e.g. green when there is only a very small
+    //  amount of battery charge left, but the battery is still discharging.
+    let is_discharging_with_margin = schedule
+        .iter()
+        .filter(|block| block.start_time <= date_time && block.end_time > date_time)
+        .last()
+        .map(|b| soc > (b.soc_out + 15) as u8)
+        .unwrap_or(false);
 
-    if is_discharging && charge_price.is_some() {
-        cost_to_color(charge_price)
-    } else if now_color == TariffColor::Yellow && soc_ok && is_discharging {
-        TariffColor::Green
-    } else if now_color == TariffColor::Red && soc_ok && is_discharging {
-        TariffColor::Yellow
+    let last_charge_time = schedule
+        .iter()
+        .filter(|b| b.block_type == BlockType::Charge && date_time > b.end_time)
+        .last()
+        .map(|b| (b.start_time, b.end_time));
+
+    let charge_price: Option<f64> = last_charge_time.map(|(start, end)| {
+        let mut intervals = 0;
+        let total_price: f64 = successors(Some(start), |&t| {
+            let next = t + TimeDelta::minutes(15);
+            (next < end).then_some(next)
+        })
+            .inspect(|_| intervals += 1)
+            .map(|t| tariffs.get(&t).copied().unwrap_or(0.0))
+            .sum();
+
+        total_price / intervals as f64
+    });
+
+    let now_color = tariff_color_now(date_time, tariffs);
+
+    if is_discharging_with_margin {
+        if charge_price.is_some() {
+            cost_to_color(charge_price)
+        } else {
+            match now_color {
+                TariffColor::Yellow => TariffColor::Green,
+                TariffColor::Red => TariffColor::Yellow,
+                _ => now_color,
+            }
+        }
     } else {
         now_color
     }
