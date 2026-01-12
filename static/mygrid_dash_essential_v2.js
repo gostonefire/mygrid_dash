@@ -46,6 +46,20 @@ function refreshData(forceRefresh) {
         let temp_current = Math.round(resp.temp_current * 10) / 10;
         let temp_perceived = Math.round(resp.temp_perceived * 10) / 10
 
+        let symbols_body = $('#symbols');
+
+        symbols_body.empty();
+        for (let i = 0; i < resp.forecast_symbol.length; i++) {
+            let row = resp.forecast_symbol[i];
+
+            let d = new Date(row.x);
+            let time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            symbols_body.append('<div  class="symbol">' +
+                '<p class="symbol-text">' + time + '</p>' +
+                '<img src="/symbols/' + row.y + '.webp" alt="" width="30px" height="30px">' +
+                '</div>');
+        }
+
         $("#policy-bar").width("100%").css("background-color", color);
         $("#current-temp").text(temp_current + " (" + temp_perceived + ") ℃");
         $("#minmax-today").text("Today: " + resp.today_max + " / " + resp.today_min + " ℃");

@@ -46,6 +46,7 @@ pub struct TwoDayMinMax {
 pub struct WeatherData {
     pub temp_history: Vec<DataItem<f64>>,
     pub forecast_temp: Vec<DataItem<f64>>,
+    pub forecast_symbol: Vec<DataItem<u8>>,
     pub min_max: TwoDayMinMax,
     pub temp_current: f64,
     pub temp_perceived: f64,
@@ -54,6 +55,7 @@ pub struct WeatherData {
 
 pub struct ForecastData {
     pub forecast_temp: Vec<DataItem<f64>>,
+    pub symbol_code: Vec<DataItem<u8>>,
 }
 
 pub struct HistoryData {

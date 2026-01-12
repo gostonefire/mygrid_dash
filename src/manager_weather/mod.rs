@@ -54,9 +54,10 @@ impl Weather {
         let json = req.text().await?;
         let weather_res: Vec<ForecastRecord> = serde_json::from_str(&json)?;
 
-        let mut result = ForecastData { forecast_temp: Vec::new() };
+        let mut result = ForecastData { forecast_temp: Vec::new(), symbol_code: Vec::new() };
         weather_res.into_iter().for_each(|w| {
             w.temperature.map(|t| result.forecast_temp.push(DataItem{x: w.date_time, y: t}));
+            w.symbol_code.map(|c| result.symbol_code.push(DataItem{x: w.date_time, y: c}));
         });
 
         Ok(result)

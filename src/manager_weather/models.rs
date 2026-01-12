@@ -24,4 +24,5 @@ pub struct Temperature<T> {
 pub struct ForecastRecord {
     pub date_time: DateTime<Utc>,
     pub temperature: Option<f64>,
+    pub symbol_code: Option<u8>,
 }

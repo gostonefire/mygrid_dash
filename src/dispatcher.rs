@@ -173,6 +173,7 @@ impl Dispatcher {
             weather_data: WeatherData {
                 temp_history: Vec::new(),
                 forecast_temp: Vec::new(),
+                forecast_symbol: Vec::new(),
                 min_max: TwoDayMinMax {
                     yesterday_min: 0.0,
                     yesterday_max: 0.0,
@@ -218,6 +219,7 @@ impl Dispatcher {
             yesterday_max: f64,
             today_min: f64,
             today_max: f64,
+            forecast_symbol: &'a Vec<DataItem<u8>>,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             tariffs_buy: Series<'a, DataItem<f64>>,
             tariffs_buy_tomorrow: Option<Series<'a, DataItem<f64>>>,
@@ -249,6 +251,7 @@ impl Dispatcher {
             yesterday_max: self.weather_data.min_max.yesterday_max,
             today_min: self.weather_data.min_max.today_min,
             today_max: self.weather_data.min_max.today_max,
+            forecast_symbol: &self.weather_data.forecast_symbol,
             temp_diagram: (
                 Series {
                     name: "Forecast".to_string(),
@@ -396,6 +399,7 @@ impl Dispatcher {
         info!("updating weather data");
         let forecast = self.weather.get_forecast(today_start, today_end).await?;
         self.weather_data.forecast_temp = forecast.forecast_temp;
+        self.weather_data.forecast_symbol = forecast.symbol_code;
         
         let history = self.weather.get_temp_history(today_start, utc_now, true).await?;
 
