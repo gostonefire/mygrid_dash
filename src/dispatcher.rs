@@ -172,6 +172,7 @@ impl Dispatcher {
             },
             weather_data: WeatherData {
                 temp_history: Vec::new(),
+                forecast_temp: Vec::new(),
                 min_max: TwoDayMinMax {
                     yesterday_min: 0.0,
                     yesterday_max: 0.0,
@@ -252,7 +253,7 @@ impl Dispatcher {
                 Series {
                     name: "Forecast".to_string(),
                     chart_type: String::new(),
-                    data: &self.mygrid_data.forecast_temp,
+                    data: &self.weather_data.forecast_temp,
                 },
                 Series {
                     name: "Actual".to_string(),
@@ -361,7 +362,7 @@ impl Dispatcher {
             },
             temp_diagram: (
                 Series {
-                    name: "Forecast".to_string(),
+                    name: "Forecast (MyGrid)".to_string(),
                     chart_type: String::new(),
                     data: &self.mygrid_data.forecast_temp,
                 },
@@ -393,7 +394,9 @@ impl Dispatcher {
         }
         
         info!("updating weather data");
-
+        let forecast = self.weather.get_forecast(today_start, today_end).await?;
+        self.weather_data.forecast_temp = forecast.forecast_temp;
+        
         let history = self.weather.get_temp_history(today_start, utc_now, true).await?;
 
         self.weather_data.temp_history = history.history;

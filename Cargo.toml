@@ -1,6 +1,6 @@
 [package]
 name = "mygrid_dash"
-version = "2.6.15"
+version = "2.7.0"
 edition = "2021"
 
 [dependencies]

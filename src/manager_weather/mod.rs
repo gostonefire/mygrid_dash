@@ -5,8 +5,8 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use crate::manager_weather::errors::WeatherError;
-use crate::manager_weather::models::{MinMax, Temperature};
-use crate::models::{DataItem, TemperatureData};
+use crate::manager_weather::models::{ForecastRecord, MinMax, Temperature};
+use crate::models::{DataItem, ForecastData, TemperatureData};
 
 
 /// Weather manager
@@ -32,13 +32,42 @@ impl Weather {
         
         Ok(Self { client, host: host.to_string(), sensor: sensor.to_string() })
     }
+
+    /// Returns the temperature forecast from within the given time boundaries
+    ///
+    /// # Arguments
+    ///
+    /// * 'from' - from datetime
+    /// * 'to' - to datetime (non-inclusive)
+    pub async fn get_forecast(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<ForecastData, WeatherError> {
+        let url = format!("http://{}/forecast", self.host);
+
+        let req = self.client.get(&url)
+            .query(&[("id", "smhi"), ("from", &from.to_rfc3339()), ("to", &to.to_rfc3339())])
+            .send().await?;
+
+        let status = req.status();
+        if !status.is_success() {
+            return Err(WeatherError(format!("{:?}", status)));
+        }
+
+        let json = req.text().await?;
+        let weather_res: Vec<ForecastRecord> = serde_json::from_str(&json)?;
+
+        let mut result = ForecastData { forecast_temp: Vec::new() };
+        weather_res.into_iter().for_each(|w| {
+            w.temperature.map(|t| result.forecast_temp.push(DataItem{x: w.date_time, y: t}));
+        });
+
+        Ok(result)
+    }
     
-    /// Returns the temperature history from within the given time boundaries (inclusive)
+    /// Returns the temperature history from within the given time boundaries
     /// 
     /// # Arguments
     /// 
     /// * 'from' - from datetime
-    /// * 'to' - to datetime
+    /// * 'to' - to datetime (non-inclusive)
     /// * 'ensure_from' - if true the 'from' date will have a data item
     pub async fn get_temp_history(&self, from: DateTime<Utc>, to: DateTime<Utc>, ensure_from: bool) -> Result<TemperatureData<f64>, WeatherError> {
         let url = format!("http://{}/temperature", self.host);
@@ -58,7 +87,6 @@ impl Weather {
         
         Ok(transform_history(weather_res, from_date, to))
     }
-
     
     /// Returns today's and yesterday's min/max temperatures
     ///

@@ -45,10 +45,15 @@ pub struct TwoDayMinMax {
 
 pub struct WeatherData {
     pub temp_history: Vec<DataItem<f64>>,
+    pub forecast_temp: Vec<DataItem<f64>>,
     pub min_max: TwoDayMinMax,
     pub temp_current: f64,
     pub temp_perceived: f64,
     pub last_end_time: DateTime<Utc>,
+}
+
+pub struct ForecastData {
+    pub forecast_temp: Vec<DataItem<f64>>,
 }
 
 pub struct HistoryData {

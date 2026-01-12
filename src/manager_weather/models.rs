@@ -19,3 +19,9 @@ pub struct Temperature<T> {
     pub current_temp: Option<T>,
     pub perceived_temp: Option<T>,
 }
+
+#[derive(Deserialize)]
+pub struct ForecastRecord {
+    pub date_time: DateTime<Utc>,
+    pub temperature: Option<f64>,
+}
