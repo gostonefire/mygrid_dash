@@ -19,3 +19,7 @@ target/
 # Added by cargo
 
 /target
+
+# Added by developer
+/static/index.html
+/static/index_full.html

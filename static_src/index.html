@@ -47,6 +47,9 @@
             margin-top: 10px;
         }
         #symbols {
+            display: flex;
+            flex-flow: row wrap;
+            justify-content: space-around;
             max-width: 800px;
             flex-basis: 100%;
             border: 2px solid lightseagreen;
@@ -54,7 +57,7 @@
             background: darkcyan;
             padding-top: 5px;
             padding-left: 5px;
-            padding-bottom: 5px;
+            padding-right: 5px;
         }
         #current-temp {
             color: white;
@@ -152,16 +155,8 @@
         </div>
         <div class="flex-row" id="symbols">
             <div  class="symbol">
-                <p class="symbol-text">00:00</p>
+                <p class="symbol-text">00</p>
                 <img src="/symbols/1.webp" alt="" width="30px" height="30px">
-            </div>
-            <div class="symbol">
-                <p class="symbol-text">01:00</p>
-                <img src="/symbols/2.webp" alt="" width="30px" height="30px">
-            </div>
-            <div  class="symbol">
-                <p class="symbol-text">02:00</p>
-                <img src="/symbols/3.webp" alt="" width="30px" height="30px">
             </div>
         </div>
         <div class="diagrams" id="temperature"></div>
@@ -199,7 +194,7 @@
     </div>
     <div id="dim_screen" onclick="undimScreen()"></div>
 
-<script src="./mygrid_dash_essential_v2.js?v=2.7.0"></script>
+<script src="./mygrid_dash_essential_v2.js?v={{JS_HASH}}"></script>
 
 </body>
 </html>

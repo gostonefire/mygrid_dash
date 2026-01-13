@@ -46,6 +46,8 @@ function refreshData(forceRefresh) {
         let temp_current = Math.round(resp.temp_current * 10) / 10;
         let temp_perceived = Math.round(resp.temp_perceived * 10) / 10
 
+        let datetime = new Date();
+
         let symbols_body = $('#symbols');
 
         symbols_body.empty();
@@ -53,9 +55,14 @@ function refreshData(forceRefresh) {
             let row = resp.forecast_symbol[i];
 
             let d = new Date(row.x);
-            let time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            let style = '';
+            if (d.getHours() < datetime.getHours()) {
+                style = 'font-weight: bold;color: dimgray';
+            }
+
+            let time = `${String(d.getHours()).padStart(2, '0')}`;
             symbols_body.append('<div  class="symbol">' +
-                '<p class="symbol-text">' + time + '</p>' +
+                '<p class="symbol-text" style="' + style + '">' + time + '</p>' +
                 '<img src="/symbols/' + row.y + '.webp" alt="" width="30px" height="30px">' +
                 '</div>');
         }
@@ -92,7 +99,6 @@ function refreshData(forceRefresh) {
 
         $("#version").text("Version: " + resp.version);
         
-        let datetime = new Date();
         let coeff = 1000 * 60 * 15;
         let datetime_quarters = new Date(Math.floor((datetime.getTime() - resp.time_delta) / coeff) * coeff);
 
