@@ -60,7 +60,7 @@ run_as_user() {
 
   ### Add any extra deploy features to be run as dev user from here ###
   mkdir -p "$HOME/$APP_DIR/static"
-  rm -f "$HOME/$APP_DIR/static/"*
+  rm -rf "$HOME/$APP_DIR/static/"*
 
   cp -r "./static/." "$HOME/$APP_DIR/static/" >> "$SUB_SCRIPT_LOG" 2>&1
   EXIT_CODE=$?
