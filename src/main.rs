@@ -4,16 +4,21 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
-use axum::http::{header, HeaderValue};
-use axum::Router;
-use axum::routing::get;
+
+use axum::{
+    http::{header, HeaderValue, Request},
+    middleware::{self, Next},
+    response::Response,
+    routing::get,
+    Router,
+};
+use axum::body::Body;
 use tokio::sync::{Mutex, RwLock};
 use chrono::Utc;
 use log::{error, info};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tower_http::services::{ServeDir, ServeFile};
-use tower_http::set_header::SetResponseHeaderLayer;
 use crate::errors::UnrecoverableError;
 use crate::initialization::{config, Google};
 use crate::dispatcher::{run, Cmd};
@@ -82,12 +87,9 @@ async fn main() -> Result<(), UnrecoverableError> {
         .route("/data/{dash_type}", get(get_data))
         .route("/login", get(login))
         .route("/code", get(code))
-        .route_service("/full", ServeFile::new("static/index_full.html"))
+        .nest_service("/full", ServeFile::new("static/index_full.html"))
         .fallback_service(static_service)
-        .layer(SetResponseHeaderLayer::if_not_present(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("no-cache"),
-        ))
+        .layer(middleware::from_fn(cache_control_middleware))
         .with_state(shared_state);
 
     let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address).expect("invalid BIND_ADDR");
@@ -110,6 +112,47 @@ async fn main() -> Result<(), UnrecoverableError> {
             disp_comms.rx_from_mygrid = rx_from_mygrid;
         }
     }
+}
+
+/// Sets cache headers
+async fn cache_control_middleware(req: Request<Body>, next: Next) -> Response {
+    let path = req.uri().path().to_owned();
+    let has_version = req.uri().query().map_or(false, |q| q.contains("v="));
+
+    let response = next.run(req).await;
+    let (mut parts, body) = response.into_parts();
+
+    // Determine the best caching header
+    let cache_header = if path == "/" || path == "/full" || path.ends_with(".html") {
+        // 1. Entry Points: Never cache HTML so users always get the latest JS hashes
+        "no-cache"
+    } else if has_version {
+        // 2. Versioned Assets: Cache forever (JS files with ?v=hash from build.rs)
+        "public, max-age=31536000, immutable"
+    } else if is_static_asset(&path) {
+        // 3. General Static Assets: Stale-While-Revalidate
+        // Cache for 1 hour, allow stale use for 24 hours while updating
+        "public, max-age=3600, stale-while-revalidate=86400"
+    } else {
+        // Default for API responses
+        "no-cache"
+    };
+
+    parts.headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(cache_header)
+    );
+
+    Response::from_parts(parts, body)
+}
+
+fn is_static_asset(path: &str) -> bool {
+    path.ends_with(".css") ||
+        path.ends_with(".js") ||
+        path.ends_with(".webp") ||
+        path.ends_with(".png") ||
+        path.ends_with(".json") ||
+        path.ends_with(".ico")
 }
 
 /// Loop that purges old entries from the session store
