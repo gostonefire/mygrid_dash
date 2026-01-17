@@ -31,10 +31,10 @@ pub async fn get_schedule(schedule_path: &str) -> Result<Vec<Block>, MyGridError
 /// # Arguments
 /// 
 /// * 'base_data_path' - full path to the base data file from mygrid
-/// * 'day_start' - start date and time for the day worth of data to be returned
-pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Result<MygridData, MyGridError> {
-
-    let file_path = format!("{}{}_base_data.json", base_data_path, day_start.format("%Y%m%d%H%M"));
+/// * 'utc_now' - date time to check a valid base data file for
+/// * 'day_start' - start of day to filter for
+/// * 'day_end' - end of day to filter for (non-inclusive)
+pub async fn get_base_data(base_data_path: &str, utc_now: DateTime<Utc>, day_start: DateTime<Utc>, day_end: DateTime<Utc>) -> Result<MygridData, MyGridError> {
 
     let mut mygrid = MygridData {
         base_cost: 0.0,
@@ -43,8 +43,6 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         forecast_cloud: Vec::new(),
         prod: Vec::new(),
         load: Vec::new(),
-        tariffs_buy: Vec::new(),
-        tariffs_sell: Vec::new(),
         tariff_fees: TariffFees {
             variable_fee: 0.0,
             spot_fee_percentage: 0.0,
@@ -58,8 +56,9 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         policy_tariffs: HashMap::new(),
     };
 
-    if tokio::fs::try_exists(&file_path).await? {
-        let json = tokio::fs::read_to_string(file_path).await?;
+    let json = get_latest_base_data_content(base_data_path, utc_now).await?;
+
+    if let Some(json) = json {
         let base_data: BaseData = serde_json::from_str(&json)?;
         mygrid.base_cost = base_data.base_cost;
         mygrid.schedule_cost = base_data.schedule_cost;
@@ -72,29 +71,47 @@ pub async fn get_base_data(base_data_path: &str, day_start: DateTime<Utc>) -> Re
         mygrid.tariff_fees.guarantees_of_origin = base_data.tariff_fees.guarantees_of_origin;
         mygrid.tariff_fees.fixed = base_data.tariff_fees.fixed;
 
-        for d in base_data.forecast {
-            mygrid.forecast_temp.push(DataItem { x: d.date_time, y: d.temp });
-            mygrid.forecast_cloud.push(DataItem { x: d.date_time, y: 1.0 - d.cloud_factor });
-        }
+        base_data.forecast.into_iter().filter(|f| f.date_time >= day_start && f.date_time < day_end).for_each(|f| {
+            mygrid.forecast_temp.push(DataItem { x: f.date_time, y: f.temp });
+            mygrid.forecast_cloud.push(DataItem { x: f.date_time, y: 1.0 - f.cloud_factor });
+        });
 
-        for d in base_data.production {
+        base_data.production.into_iter().filter(|d| d.date_time >= day_start && d.date_time < day_end).for_each(|d| {
             mygrid.prod.push(DataItem { x: d.date_time, y: to_kw(d.data, 1) });
-        }
+        });
 
-        for d in base_data.consumption {
+        base_data.consumption.into_iter().filter(|d| d.date_time >= day_start && d.date_time < day_end).for_each(|d| {
             mygrid.load.push(DataItem { x: d.date_time, y: to_kw(d.data, 1) });
-        }
-
-        for d in base_data.tariffs {
-            mygrid.tariffs_buy.push(DataItem { x: d.date_time, y: d.buy });
-            mygrid.tariffs_sell.push(DataItem { x: d.date_time, y: d.sell });
-            mygrid.policy_tariffs.insert(d.date_time, d.buy);
-        }
+        });
     }
 
     Ok(mygrid)
 }
 
+/// Finds and reads the latest base data file that is equal to or older than the target time
+///
+/// # Arguments
+///
+/// * 'dir_path' - path to the base data dir
+/// * 'target_time' - the time to find the latest base data file for
+pub async fn get_latest_base_data_content(dir_path: &str, target_time: DateTime<Utc>) -> Result<Option<String>, MyGridError> {
+    let limit_filename = format!("{}_base_data.json", target_time.format("%Y%m%d%H%M"));
+    let pattern = format!("{}/*_base_data.json", dir_path);
+
+    let latest_file = glob::glob(&pattern)?
+        .filter_map(Result::ok)
+        .filter_map(|p| p.file_name()?.to_str().map(|s| s.to_string()))
+        .filter(|name| name <= &limit_filename)
+        .max();
+
+    if let Some(file_name) = latest_file {
+        let full_path = std::path::Path::new(dir_path).join(file_name);
+        let content = tokio::fs::read_to_string(full_path).await?;
+        Ok(Some(content))
+    } else {
+        Ok(None)
+    }
+}
 
 
 /// Converts and rounds from watts to kWh

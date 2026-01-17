@@ -94,8 +94,6 @@ pub struct MygridData {
     pub forecast_cloud: Vec<DataItem<f64>>,
     pub prod: Vec<DataItem<f64>>,
     pub load: Vec<DataItem<f64>>,
-    pub tariffs_buy: Vec<DataItem<f64>>,
-    pub tariffs_sell: Vec<DataItem<f64>>,
     pub tariff_fees: TariffFees,
     pub policy_tariffs: HashMap<DateTime<Utc>, f64>,
 }

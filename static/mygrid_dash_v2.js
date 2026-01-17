@@ -39,7 +39,14 @@ function refreshData() {
         
         realtime.updateSeries([resp.current_prod_load]);
         soc.updateSeries([resp.current_soc_soh]);
-        tariffs_buy.updateSeries([resp.tariffs_buy]);
+
+        if (resp.tariffs_buy != null) {
+            $("#tariffs-buy").show();
+            tariffs_buy.updateSeries([resp.tariffs_buy]);
+        } else {
+            $("#tariffs-buy").hide();
+        }
+
         production.updateSeries(resp.prod_diagram);
         load.updateSeries(resp.load_diagram);
         cloud.updateSeries([resp.cloud_diagram]);

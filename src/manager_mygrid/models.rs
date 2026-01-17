@@ -28,14 +28,6 @@ pub struct ConsumptionValues {
 }
 
 #[derive(Deserialize)]
-pub struct TariffValues {
-    #[serde(rename(deserialize = "valid_time"))]
-    pub date_time: DateTime<Utc>,
-    pub buy: f64,
-    pub sell: f64,
-}
-
-#[derive(Deserialize)]
 pub struct TariffFees {
     // Power grid fees (öre/kWh, exl. VAT)
     pub variable_fee: f64,
@@ -57,7 +49,6 @@ pub struct BaseData {
     pub forecast: Vec<ForecastValues>,
     pub production: Vec<ProductionValues>,
     pub consumption: Vec<ConsumptionValues>,
-    pub tariffs: Vec<TariffValues>,
     pub tariff_fees: TariffFees,
 }
 

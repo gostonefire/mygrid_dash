@@ -103,6 +103,7 @@ struct Dispatcher {
     history_data: HistoryData,
     real_time_data: RealTimeData,
     weather_data: WeatherData,
+    today_tariffs: Option<Vec<DataItem<f64>>>,
     tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
     max_tariff: u8,
     usage_policy: TariffColor,
@@ -136,8 +137,6 @@ impl Dispatcher {
                 forecast_cloud: Vec::new(),
                 prod: Vec::new(),
                 load: Vec::new(),
-                tariffs_buy: Vec::new(),
-                tariffs_sell: Vec::new(),
                 tariff_fees: TariffFees {
                     variable_fee: 0.0,
                     spot_fee_percentage: 0.0,
@@ -184,6 +183,7 @@ impl Dispatcher {
                 temp_perceived: 0.0,
                 last_end_time: Default::default(),
             },
+            today_tariffs: None,
             tomorrow_tariffs: None,
             max_tariff: 0,
             usage_policy: TariffColor::Green,
@@ -221,7 +221,7 @@ impl Dispatcher {
             today_max: f64,
             forecast_symbol: &'a Vec<DataItem<u8>>,
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
-            tariffs_buy: Series<'a, DataItem<f64>>,
+            tariffs_buy: Option<Series<'a, DataItem<f64>>>,
             tariffs_buy_tomorrow: Option<Series<'a, DataItem<f64>>>,
             max_tariff: u8,
             schedule: &'a Vec<Block>,
@@ -230,6 +230,18 @@ impl Dispatcher {
             time_delta: i64,
             version: &'a String,
         }
+
+        let tariffs_buy = if let Some(tariffs) = &self.today_tariffs {
+            Some(
+                Series {
+                    name: "Tariffs".to_string(),
+                    chart_type: String::new(),
+                    data: tariffs,
+                }
+            )
+        } else {
+            None
+        };
 
         let tariffs_buy_tomorrow = if let Some(tariffs) = &self.tomorrow_tariffs {
             Some(
@@ -264,11 +276,7 @@ impl Dispatcher {
                     data: &self.weather_data.temp_history,
                 },
             ),
-            tariffs_buy: Series {
-                name: "Tariffs".to_string(),
-                chart_type: String::new(),
-                data: &self.mygrid_data.tariffs_buy,
-            },
+            tariffs_buy,
             tariffs_buy_tomorrow,
             max_tariff: self.max_tariff,
             schedule: &self.schedule,
@@ -295,7 +303,7 @@ impl Dispatcher {
             today_max: f64,
             current_prod_load: Series<'a, DataPoint<f64>>,
             current_soc_soh: Series<'a, DataPoint<u8>>,
-            tariffs_buy: Series<'a, DataItem<f64>>,
+            tariffs_buy: Option<Series<'a, DataItem<f64>>>,
             max_tariff: u8,
             prod_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             load_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
@@ -303,6 +311,18 @@ impl Dispatcher {
             temp_diagram: (Series<'a, DataItem<f64>>, Series<'a, DataItem<f64>>),
             time_delta: i64,
         }
+
+        let tariffs_buy = if let Some(tariffs) = &self.today_tariffs {
+            Some(
+                Series {
+                    name: "Tariffs".to_string(),
+                    chart_type: String::new(),
+                    data: tariffs,
+                }
+            )
+        } else {
+            None
+        };
 
         let reply = FullDashData {
             policy: self.usage_policy.clone(),
@@ -328,11 +348,7 @@ impl Dispatcher {
                     DataPoint { x: "SoH".to_string(), y: self.real_time_data.soh, }
                 ],
             },
-            tariffs_buy: Series {
-                name: "Tariffs Buy".to_string(),
-                chart_type: String::new(),
-                data: &self.mygrid_data.tariffs_buy,
-            },
+            tariffs_buy,
             max_tariff: self.max_tariff,
             prod_diagram: (
                 Series {
@@ -462,31 +478,51 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Updates with data from mygrid base data, schedule, and tomorrow's tariffs.
+    /// Updates with data from mygrid base data, schedule, and tariffs.
     ///
     async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
+        let utc_now = self.utc_now();
+
         self.schedule =  get_schedule(&self.schedule_path).await?;
 
-        let (today_start, _, _) = get_utc_day_start(self.utc_now(), 0);
+        let (day_start, day_end, day_date) = get_utc_day_start(utc_now, 0);
+        let (tomorrow_start, tomorrow_end, tomorrow_day_date) = get_utc_day_start(utc_now, 1);
 
-        self.mygrid_data = get_base_data(&self.base_data_path, today_start).await?;
+        self.mygrid_data = get_base_data(&self.base_data_path, utc_now, day_start, day_end).await?;
         self.nordpool.set_tariff_fees(self.mygrid_data.tariff_fees.clone());
 
-        let (tomorrow_start, tomorrow_end, tomorrow_day_date) = get_utc_day_start(self.utc_now(), 1);
-        if self.tomorrow_tariffs.is_none() || self.tomorrow_tariffs
-            .as_ref()
-            .is_some_and(|t| t.first()
-                .is_some_and(|d| d.x != tomorrow_start) || t.first().is_none()
-            ) {
-            info!("updating tomorrow's tariffs");
-            self.tomorrow_tariffs = self.nordpool.get_tariffs(tomorrow_start, tomorrow_end, tomorrow_day_date).await?;
-        }
+        self.update_tariffs_if_needed(&self.today_tariffs, day_start, day_end, day_date).await?
+            .map(|t| self.today_tariffs = Some(t));
+
+        self.update_tariffs_if_needed(&self.tomorrow_tariffs, tomorrow_start, tomorrow_end, tomorrow_day_date).await?
+            .map(|t| self.tomorrow_tariffs = Some(t));
 
         self.max_tariff = self.max_tariff();
 
         Ok(())
     }
-    
+
+    /// Updates tariffs if needed
+    ///
+    /// # Arguments
+    ///
+    /// * 'tariffs' - tariffs to update if needed
+    /// * 'day_start' - start of the day to update tariffs for
+    /// * 'day_end' - end of the day to update tariffs for
+    /// * 'day_date' - date of the day to update tariffs for
+    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Vec<DataItem<f64>>>, DispatcherError> {
+        let needs_tariff_update = tariffs.as_ref()
+            .map(|t| t.first().map_or(true, |d| d.x != day_start))
+            .unwrap_or(true);
+
+        if needs_tariff_update {
+            info!("updating tariffs for {}", day_date.format("%Y-%m-%d"));
+            Ok(self.nordpool.get_tariffs(day_start, day_end, day_date).await?)
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Updates the real time data field with fresh values
     /// We keep 2 and add the latest to have three values to return as a weighted moving average
     /// 
@@ -569,18 +605,18 @@ impl Dispatcher {
     /// returned value of 4
     ///
     fn max_tariff(&self) -> u8 {
-        let max_today = self.mygrid_data.tariffs_buy
+        let max_today = self.today_tariffs
             .iter()
+            .flatten()
             .map(|d| d.y.ceil() as u8)
             .max()
             .unwrap_or(0);
 
         let max_tomorrow = self.tomorrow_tariffs
-            .as_ref()
-            .map(|t| t.iter()
-                .map(|d| d.y.ceil() as u8)
-                .max()
-                .unwrap_or(0))
+            .iter()
+            .flatten()
+            .map(|d| d.y.ceil() as u8)
+            .max()
             .unwrap_or(0);
 
         let max = max_today.max(max_tomorrow).max(4);

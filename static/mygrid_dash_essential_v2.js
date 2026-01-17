@@ -73,7 +73,14 @@ function refreshData(forceRefresh) {
         $("#minmax-yesterday").text("Yesterday: " + resp.yesterday_max + " / " + resp.yesterday_min + " ℃");
 
         temp.updateSeries(resp.temp_diagram);
-        tariffs_buy.updateSeries([resp.tariffs_buy]);
+
+        if (resp.tariffs_buy != null) {
+            $("#tariffs-buy").show();
+            tariffs_buy.updateSeries([resp.tariffs_buy]);
+        } else {
+            $("#tariffs-buy").hide();
+        }
+
         if (resp.tariffs_buy_tomorrow != null) {
             $("#tariffs-buy-tomorrow").show();
             tariffs_tomorrow.updateSeries([resp.tariffs_buy_tomorrow]);
