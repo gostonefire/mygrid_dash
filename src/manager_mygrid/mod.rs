@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ops::Add;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use crate::manager_mygrid::errors::MyGridError;
@@ -53,7 +52,6 @@ pub async fn get_base_data(base_data_path: &str, utc_now: DateTime<Utc>, day_sta
             guarantees_of_origin: 0.0,
             fixed: 0.0,
         },
-        policy_tariffs: HashMap::new(),
     };
 
     let json = get_latest_base_data_content(base_data_path, utc_now).await?;

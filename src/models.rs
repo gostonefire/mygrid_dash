@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
@@ -94,6 +94,4 @@ pub struct MygridData {
     pub forecast_cloud: Vec<DataItem<f64>>,
     pub prod: Vec<DataItem<f64>>,
     pub load: Vec<DataItem<f64>>,
-    pub tariff_fees: TariffFees,
-    pub policy_tariffs: HashMap<DateTime<Utc>, f64>,
-}
+    pub tariff_fees: TariffFees,}

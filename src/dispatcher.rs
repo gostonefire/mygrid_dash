@@ -105,6 +105,7 @@ struct Dispatcher {
     weather_data: WeatherData,
     today_tariffs: Option<Vec<DataItem<f64>>>,
     tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
+    policy_tariffs: HashMap<DateTime<Utc>, f64>,
     max_tariff: u8,
     usage_policy: TariffColor,
     last_request: i64,
@@ -147,7 +148,6 @@ impl Dispatcher {
                     guarantees_of_origin: 0.0,
                     fixed: 0.0,
                 },
-                policy_tariffs: HashMap::new(),
             },
             fox_cloud,
             weather,
@@ -185,6 +185,7 @@ impl Dispatcher {
             },
             today_tariffs: None,
             tomorrow_tariffs: None,
+            policy_tariffs: HashMap::new(),
             max_tariff: 0,
             usage_policy: TariffColor::Green,
             last_request: 0,
@@ -492,7 +493,15 @@ impl Dispatcher {
         self.nordpool.set_tariff_fees(self.mygrid_data.tariff_fees.clone());
 
         self.update_tariffs_if_needed(&self.today_tariffs, day_start, day_end, day_date).await?
-            .map(|t| self.today_tariffs = t);
+            .map(|t| {
+                self.today_tariffs = t;
+                self.policy_tariffs = self.today_tariffs
+                    .as_ref()
+                    .map(|v| v.iter()
+                        .map(|t| (t.x, t.y))
+                        .collect())
+                    .unwrap_or_default();
+            });
 
         self.update_tariffs_if_needed(&self.tomorrow_tariffs, tomorrow_start, tomorrow_end, tomorrow_day_date).await?
             .map(|t| self.tomorrow_tariffs = t);
@@ -575,7 +584,7 @@ impl Dispatcher {
             utc_now.duration_trunc(TimeDelta::minutes(15))?, 
             self.real_time_data.soc,
             &self.schedule,
-            &self.mygrid_data.policy_tariffs,
+            &self.policy_tariffs,
         );
         
         Ok(())
