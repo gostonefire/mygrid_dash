@@ -492,10 +492,10 @@ impl Dispatcher {
         self.nordpool.set_tariff_fees(self.mygrid_data.tariff_fees.clone());
 
         self.update_tariffs_if_needed(&self.today_tariffs, day_start, day_end, day_date).await?
-            .map(|t| self.today_tariffs = Some(t));
+            .map(|t| self.today_tariffs = t);
 
         self.update_tariffs_if_needed(&self.tomorrow_tariffs, tomorrow_start, tomorrow_end, tomorrow_day_date).await?
-            .map(|t| self.tomorrow_tariffs = Some(t));
+            .map(|t| self.tomorrow_tariffs = t);
 
         self.max_tariff = self.max_tariff();
 
@@ -510,14 +510,16 @@ impl Dispatcher {
     /// * 'day_start' - start of the day to update tariffs for
     /// * 'day_end' - end of the day to update tariffs for
     /// * 'day_date' - date of the day to update tariffs for
-    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Vec<DataItem<f64>>>, DispatcherError> {
+    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Option<Vec<DataItem<f64>>>>, DispatcherError> {
         let needs_tariff_update = tariffs.as_ref()
             .map(|t| t.first().map_or(true, |d| d.x != day_start))
             .unwrap_or(true);
 
         if needs_tariff_update {
-            info!("updating tariffs for {}", day_date.format("%Y-%m-%d"));
-            Ok(self.nordpool.get_tariffs(day_start, day_end, day_date).await?)
+            let new_tariffs = self.nordpool.get_tariffs(day_start, day_end, day_date).await?
+                .inspect(|_| info!("updating tariffs for {}", day_date.format("%Y-%m-%d")));
+            
+            Ok(Some(new_tariffs))
         } else {
             Ok(None)
         }
