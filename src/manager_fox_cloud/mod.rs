@@ -1,4 +1,3 @@
-pub mod errors;
 mod models;
 
 use std::str::FromStr;
@@ -8,8 +7,8 @@ use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use thiserror::Error;
 use crate::initialization::FoxESS;
-use crate::manager_fox_cloud::errors::FoxError;
 use crate::manager_fox_cloud::models::{DeviceHistory, DeviceHistoryData, DeviceHistoryResult, DeviceRealTime, DeviceRealTimeResult, RequestDeviceHistoryData, RequestDeviceRealTimeData};
 
 const REQUEST_DOMAIN: &str = "https://www.foxesscloud.com";
@@ -225,4 +224,14 @@ struct FoxResponse {
     msg: String,
 }
 
-
+#[derive(Debug, Error)]
+pub enum FoxError {
+    #[error("FoxCloud: {0}")]
+    FoxCloud(String),
+    #[error("ReqwestError: {0}")]
+    ReqwestError(#[from] reqwest::Error),
+    #[error("JsonParseError: {0}")]
+    JsonParseError(#[from] serde_json::Error),
+    #[error("ChronoParseError: {0}")]
+    ChronoParseError(#[from] chrono::format::ParseError),
+}

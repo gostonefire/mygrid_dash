@@ -1,11 +1,10 @@
 use std::ops::Add;
 use chrono::{DateTime, Local, TimeDelta, Utc};
-use crate::manager_mygrid::errors::MyGridError;
+use thiserror::Error;
 use crate::manager_mygrid::models::{BaseData, Block, SourceBlock};
 use crate::models::{DataItem, MygridData, TariffFees};
 
 pub mod models;
-pub mod errors;
 
 /// Size of the smallest block possible in minutes
 const BLOCK_UNIT_SIZE: i64 = 15;
@@ -142,4 +141,16 @@ fn transform_source_block(block: &SourceBlock) -> Block {
         end_time: block.end_time.add(TimeDelta::minutes(BLOCK_UNIT_SIZE)),
         length: format!("{:02}:{:02}", length.num_hours(), length.num_minutes() - length.num_hours() * 60),
     }
+}
+
+#[derive(Debug, Error)]
+pub enum MyGridError {
+    #[error("FileReadError: {0}")]
+    FileReadError(#[from] std::io::Error),
+    #[error("JsonError: {0}")]
+    JsonError(#[from] serde_json::Error),
+    #[error("ChronoParseError: {0}")]
+    ChronoParseError(#[from] chrono::format::ParseError),
+    #[error("GlobPatternError: {0}")]
+    GlobPatternError(#[from] glob::PatternError),
 }

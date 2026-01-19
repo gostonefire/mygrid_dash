@@ -1,10 +1,9 @@
-pub mod errors;
 mod models;
 
 use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
-use crate::manager_weather::errors::WeatherError;
+use thiserror::Error;
 use crate::manager_weather::models::{ForecastRecord, MinMax, Temperature};
 use crate::models::{DataItem, ForecastData, TemperatureData};
 
@@ -48,7 +47,7 @@ impl Weather {
 
         let status = req.status();
         if !status.is_success() {
-            return Err(WeatherError(format!("{:?}", status)));
+            return Err(WeatherError::ForecastError(format!("response with status: {:?}", status)));
         }
 
         let json = req.text().await?;
@@ -79,7 +78,7 @@ impl Weather {
 
         let status = req.status();
         if !status.is_success() {
-            return Err(WeatherError(format!("{:?}", status)));
+            return Err(WeatherError::TempHistoryError(format!("response with status: {:?}", status)));
         }
 
         let json = req.text().await?;
@@ -104,7 +103,7 @@ impl Weather {
 
         let status = req.status();
         if !status.is_success() {
-            return Err(WeatherError(format!("{:?}", status)));
+            return Err(WeatherError::TempMinMaxError(format!("response with status: {:?}", status)));
         }
 
         let json = req.text().await?;
@@ -149,4 +148,20 @@ fn transform_history<T: Copy>(history: Temperature<T>, from: Option<DateTime<Utc
 
         result
     }
+}
+
+#[derive(Debug, Error)]
+pub enum WeatherError {
+    #[error("ReqwestError: {0}")]
+    ReqwestError(#[from] reqwest::Error),
+    #[error("SerdeJsonError: {0}")]
+    SerdeJsonError(#[from] serde_json::error::Error),
+    #[error("ChronoParseError: {0}")]
+    ChronoParseError(#[from] chrono::format::ParseError),
+    #[error("MinMaxTempError: {0}")]
+    TempMinMaxError(String),
+    #[error("TempHistoryError: {0}")]
+    TempHistoryError(String),
+    #[error("ForecastError: {0}")]
+    ForecastError(String)
 }

@@ -4,7 +4,7 @@ use chrono::{DateTime, Local};
 use jsonwebtoken::jwk::JwkSet;
 use log::LevelFilter;
 use serde::Deserialize;
-use crate::errors::ConfigError;
+use thiserror::Error;
 use crate::logging::setup_logger;
 
 #[derive(Deserialize, Clone)]
@@ -83,10 +83,10 @@ pub fn config() -> Result<Config, ConfigError> {
     let args: Vec<String> = env::args().collect();
     let config_path = args.iter()
         .find(|p| p.starts_with("--config="))
-        .ok_or(ConfigError::from("missing --config=<config_path>"))?;
+        .ok_or(ConfigError::InvalidConfigParameterError)?;
     let config_path = config_path
         .split_once('=')
-        .ok_or(ConfigError::from("invalid --config=<config_path>"))?
+        .ok_or(ConfigError::InvalidConfigParameterError)?
         .1;
     
     let mut config = load_config(&config_path)?;
@@ -130,4 +130,24 @@ fn read_credential(name: &str) -> Result<String, ConfigError> {
     p.push(name);
     let bytes = fs::read(p)?;
     Ok(String::from_utf8(bytes)?.trim_end().to_string())
+}
+
+/// Errors while managing configuration
+///
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("TomlParseError: {0}")]
+    TomlParseError(#[from] toml::de::Error),
+    #[error("LoggerSetupError: {0}")]
+    LoggerSetupError(#[from] log::SetLoggerError),
+    #[error("Log4rsConfigErrors: {0}")]
+    Log4rsConfigErrors(#[from] log4rs::config::runtime::ConfigErrors),
+    #[error("StringConversionError: {0}")]
+    StringConversionError(#[from] alloc::string::FromUtf8Error),
+    #[error("EnvVarError: {0}")]
+    EnvVarError(#[from] env::VarError),
+    #[error("Invalid --config=<config_path> argument")]
+    InvalidConfigParameterError,
 }

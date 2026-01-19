@@ -1,5 +1,3 @@
-mod errors;
-
 use std::ops::Add;
 use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
@@ -8,9 +6,9 @@ use jsonwebtoken::jwk::{AlgorithmParameters, JwkSet};
 use log::info;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::RwLock;
 use crate::initialization::Google;
-use crate::manager_tokens::errors::TokenError;
 
 #[derive(Deserialize)]
 struct TokensResponse {
@@ -193,22 +191,89 @@ pub async fn build_access_request_url(google_config: &Arc<RwLock<Google>>, state
 fn get_max_age(response: &Response) -> Result<i64, TokenError> {
     // First get the max-age value
     let cache_control_header = response.headers().get("Cache-Control")
-        .ok_or("no cache-control header")?;
+        .ok_or(TokenError::NoCacheControlHeaderError)?;
     let cache_value = cache_control_header.to_str()
-        .map_err(|_| "invalid cache-control header")?;
+        .map_err(|_| TokenError::InvalidCacheControlHeaderError)?;
 
     let s = cache_value.split(',').map(|s| s.trim()).collect::<Vec<&str>>();
-    let s = s.into_iter().find(|s| s.starts_with("max-age")).ok_or("no max-age")?;
-    let v = s.split('=').map(|s| s.trim()).last().ok_or("invalid max-age")?;
-    let max_age = v.parse::<i64>().map_err(|_| "max-age not a number")?;
+    let s = s.into_iter().find(|s| s.starts_with("max-age")).ok_or(TokenError::NoMaxAgeError)?;
+    let v = s.split('=').map(|s| s.trim()).last().ok_or(TokenError::InvalidMaxAgeError)?;
+    let max_age = v.parse::<i64>().map_err(|_| TokenError::MaxAgeNotANumberError)?;
 
     // Then get the age value if present
     let age_header = response.headers().get("Age");
     let age = if let Some(age_header) = age_header {
-        age_header.to_str().map_err(|_| "invalid age")?.parse::<i64>().map_err(|_| "age not a number")?
+        age_header.to_str().map_err(|_| TokenError::InvalidAgeError)?.parse::<i64>().map_err(|_| TokenError::AgeNotANumberError)?
     } else {
         0
     };
 
     Ok(max_age - age)
 }
+
+#[derive(Debug, Error)]
+pub enum TokenError {
+    #[error("NoCacheControlHeaderError")]
+    NoCacheControlHeaderError,
+    #[error("InvalidCacheControlHeaderError")]
+    InvalidCacheControlHeaderError,
+    #[error("NoMaxAgeError")]
+    NoMaxAgeError,
+    #[error("InvalidMaxAgeError")]
+    InvalidMaxAgeError,
+    #[error("MaxAgeNotANumberError")]
+    MaxAgeNotANumberError,
+    #[error("InvalidAgeError")]
+    InvalidAgeError,
+    #[error("AgeNotANumberError")]
+    AgeNotANumberError,
+    #[error("InvalidJwt")]
+    InvalidJwt,
+    #[error("JwtDecodeError: {0}")]
+    JwtDecodeError(#[from] jsonwebtoken::errors::Error),
+    #[error("FileIOError: {0}")]
+    FileIOError(#[from] std::io::Error),
+    #[error("ReqwestError: {0}")]
+    ReqwestError(#[from] reqwest::Error),
+    #[error("JsonError: {0}")]
+    JsonError(#[from] serde_json::Error),
+}
+
+/*
+#[derive(Debug)]
+pub enum TokenError {
+    InvalidJwt,
+    FileIO(String),
+    Request(String),
+}
+impl fmt::Display for TokenError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            TokenError::InvalidJwt          => write!(f, "TokenError::InvalidJwt"),
+            TokenError::FileIO(e)   => write!(f, "TokenError::File: {}", e),
+            TokenError::Request(e)  => write!(f, "TokenError::Request: {}", e),
+        }
+    }
+}
+impl From<std::io::Error> for TokenError {
+    fn from(e: std::io::Error) -> Self {
+        TokenError::FileIO(e.to_string())
+    }
+}
+impl From<serde_json::Error> for TokenError {
+    fn from(e: serde_json::Error) -> Self {
+        TokenError::FileIO(e.to_string())
+    }
+}
+impl From<reqwest::Error> for TokenError {
+    fn from(e: reqwest::Error) -> Self {
+        TokenError::Request(e.to_string())
+    }
+}
+impl From<jsonwebtoken::errors::Error> for TokenError {
+    fn from(_: jsonwebtoken::errors::Error) -> Self { TokenError::InvalidJwt }
+}
+impl From<&str> for TokenError {
+    fn from(e: &str) -> Self { TokenError::Request(e.to_string()) }
+}
+ */

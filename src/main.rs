@@ -16,16 +16,15 @@ use axum::body::Body;
 use tokio::sync::{Mutex, RwLock};
 use chrono::Utc;
 use log::{error, info};
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tower_http::services::{ServeDir, ServeFile};
-use crate::errors::UnrecoverableError;
-use crate::initialization::{config, Google};
+use crate::initialization::{config, Google, ConfigError};
 use crate::dispatcher::{run, Cmd};
 use crate::handlers::*;
 use crate::manager_tokens::{google_base_data, Tokens};
 
-mod errors;
 mod initialization;
 mod logging;
 mod manager_fox_cloud;
@@ -188,4 +187,14 @@ async fn update_google_base_data(google_config: Arc<RwLock<Google>>) {
             error!("error in google_base_data: {}", e);
         }
     }
+}
+
+/// Error representing an unrecoverable error that will halt the application
+///
+#[derive(Debug, Error)]
+pub enum UnrecoverableError {
+    #[error("ConfigError: {0}")]
+    ConfigError(#[from] ConfigError),
+    #[error("std::io::Error: {0}")]
+    IOError(#[from] std::io::Error),
 }

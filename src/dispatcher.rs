@@ -3,15 +3,15 @@ use std::ops::Add;
 use chrono::{DateTime, Duration, DurationRound, Local, NaiveDate, TimeDelta, Timelike, Utc};
 use log::{error, info};
 use serde::Serialize;
+use thiserror::Error;
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use crate::errors::DispatcherError;
 use crate::initialization::Config;
-use crate::manager_fox_cloud::Fox;
-use crate::manager_mygrid::{get_base_data, get_schedule};
+use crate::manager_fox_cloud::{Fox, FoxError};
+use crate::manager_mygrid::{get_base_data, get_schedule, MyGridError};
 use crate::manager_mygrid::models::Block;
-use crate::manager_nordpool::NordPool;
-use crate::manager_weather::Weather;
+use crate::manager_nordpool::{NordPool, NordPoolError};
+use crate::manager_weather::{Weather, WeatherError};
 use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TariffFees, TwoDayMinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
@@ -73,7 +73,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
                     let data = disp.execute_cmd(cmd).await?;
                     tx.send(data)?;
                 } else {
-                    return Err("cmd receiver closed unexpectedly".into());
+                    return Err(DispatcherError::DispatchLoopError("cmd receiver closed unexpectedly".to_string()));
                 }
             },
             wake = rx_sleep.recv() => {
@@ -81,7 +81,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
                     let _ = &disp.check_updates(false).await?;
                     let _ = &disp.update_mygrid_data().await?;
                 } else {
-                    return Err("wake receiver closed unexpectedly".into());
+                    return Err(DispatcherError::DispatchLoopError("wake receiver closed unexpectedly".to_string()));
                 }
             },
             else => return Ok(()),
@@ -697,3 +697,24 @@ fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>
     (start.with_timezone(&Utc), end.with_timezone(&Utc), date.date_naive())
 }
 
+#[derive(Debug, Error)]
+pub enum DispatcherError {
+    #[error("MyGridError: {0}")]
+    MyGridError(#[from] MyGridError),
+    #[error("SendError: {0}")]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<String>),
+    #[error("FoxError: {0}")]
+    FoxError(#[from] FoxError),
+    #[error("ChronoParseError: {0}")]
+    ChronoParseError(#[from] chrono::format::ParseError),
+    #[error("ChronoRoundingError: {0}")]
+    RoundingError(#[from] chrono::round::RoundingError),
+    #[error("SerdeJsonError: {0}")]
+    SerdeJsonError(#[from] serde_json::Error),
+    #[error("WeatherError: {0}")]
+    WeatherError(#[from] WeatherError),
+    #[error("NordPoolError: {0}")]
+    NordPoolError(#[from] NordPoolError),
+    #[error("DispatchLoopError: {0}")]
+    DispatchLoopError(String),
+}
