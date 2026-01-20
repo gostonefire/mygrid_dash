@@ -3,15 +3,15 @@ use std::ops::Add;
 use chrono::{DateTime, Duration, DurationRound, Local, NaiveDate, TimeDelta, Timelike, Utc};
 use log::{error, info};
 use serde::Serialize;
-use thiserror::Error;
+use anyhow::{Result, anyhow, Context};
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::initialization::Config;
-use crate::manager_fox_cloud::{Fox, FoxError};
-use crate::manager_mygrid::{get_base_data, get_schedule, MyGridError};
+use crate::manager_fox_cloud::Fox;
+use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
-use crate::manager_nordpool::{NordPool, NordPoolError};
-use crate::manager_weather::{Weather, WeatherError};
+use crate::manager_nordpool::NordPool;
+use crate::manager_weather::Weather;
 use crate::models::{DataItem, DataPoint, HistoryData, MygridData, RealTimeData, Series, TariffColor, TariffFees, TwoDayMinMax, WeatherData};
 use crate::usage_policy::get_policy;
 
@@ -34,12 +34,12 @@ pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, confi
     let mut disp = match Dispatcher::new(config).await {
         Ok(d) => d,
         Err(e) => {
-            error!("while initializing dispatcher: {}", e);
+            error!("while initializing dispatcher: {:?}", e);
             return;
         }
     };
     if let Err(e) = &disp.update_mygrid_data().await {
-        error!("while updating mygrid data: {}", e);
+        error!("while updating mygrid data: {:?}", e);
     }
 
     match dispatch_loop(tx, rx, &mut disp).await {
@@ -47,7 +47,7 @@ pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, confi
             info!("dispatch loop terminated");
         },
         Err(e) => {
-            error!("dispatch loop terminated with error: {}", e);
+            error!("dispatch loop terminated with error: {:?}", e);
         }
     }
 }
@@ -55,7 +55,7 @@ pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, confi
 /// Main dispatch loop that regularly read mygrid files and builds up history data
 /// while also listening for requests from the web server
 ///
-async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cmd>, disp: &mut Dispatcher) -> Result<(), DispatcherError> {
+async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cmd>, disp: &mut Dispatcher) -> Result<()> {
     let (tx_sleep, mut rx_sleep) = tokio::sync::mpsc::unbounded_channel::<bool>();
     tokio::spawn(async move {
         loop {
@@ -71,9 +71,9 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
                     let _ = &disp.check_updates(true).await?;
 
                     let data = disp.execute_cmd(cmd).await?;
-                    tx.send(data)?;
+                    tx.send(data).context("failed to send command response")?;
                 } else {
-                    return Err(DispatcherError::DispatchLoopError("cmd receiver closed unexpectedly".to_string()));
+                    return Err(anyhow!("cmd receiver closed unexpectedly"));
                 }
             },
             wake = rx_sleep.recv() => {
@@ -81,7 +81,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
                     let _ = &disp.check_updates(false).await?;
                     let _ = &disp.update_mygrid_data().await?;
                 } else {
-                    return Err(DispatcherError::DispatchLoopError("wake receiver closed unexpectedly".to_string()));
+                    return Err(anyhow!("wake receiver closed unexpectedly"));
                 }
             },
             else => return Ok(()),
@@ -119,10 +119,10 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'config' - configuration struct
-    async fn new(config: &Config) -> Result<Self, DispatcherError> {
-        let fox_cloud = Fox::new(&config.fox_ess)?;
-        let weather = Weather::new(&config.weather.host, &config.weather.sensor)?;
-        let nordpool = NordPool::new()?;
+    async fn new(config: &Config) -> Result<Self> {
+        let fox_cloud = Fox::new(&config.fox_ess).context("failed to initialize FoxCloud")?;
+        let weather = Weather::new(&config.weather.host, &config.weather.sensor).context("failed to initialize Weather")?;
+        let nordpool = NordPool::new().context("failed to initialize NordPool")?;
         let time_delta = if let Some(debug_run_time) = config.general.debug_run_time {
             Utc::now() - debug_run_time.with_timezone(&Utc)
         } else {
@@ -199,10 +199,10 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'cmd' - the command to evaluate and execute
-    async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String, DispatcherError> {
+    async fn execute_cmd(&mut self, cmd: Cmd) -> Result<String> {
         let data = match cmd {
-            Cmd::SmallDashData       => self.get_small_dash_data()?,
-            Cmd::FullDashData        => self.get_full_dash_data()?,
+            Cmd::SmallDashData       => self.get_small_dash_data().context("SmallDashData generation failed")?,
+            Cmd::FullDashData        => self.get_full_dash_data().context("FullDashData generation failed")?,
         };
 
         Ok(data)
@@ -210,7 +210,7 @@ impl Dispatcher {
     
     /// Returns a json object with all necessary data for the small dash
     /// 
-    fn get_small_dash_data(&self) -> Result<String, DispatcherError> {
+    fn get_small_dash_data(&self) -> Result<String> {
         #[derive(Serialize)]
         struct SmallDashData<'a> {
             policy: TariffColor,
@@ -292,7 +292,7 @@ impl Dispatcher {
 
     /// Returns a json object with all necessary data for the full dash
     ///
-    fn get_full_dash_data(&self) -> Result<String, DispatcherError> {
+    fn get_full_dash_data(&self) -> Result<String> {
         #[derive(Serialize)]
         struct FullDashData<'a> {
             policy: TariffColor,
@@ -402,7 +402,7 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
-    async fn update_weather(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+    async fn update_weather(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
         let (today_start, today_end, _) = get_utc_day_start(utc_now, 0);
         let (yesterday_start, yesterday_end, _) = get_utc_day_start(utc_now, -1);
 
@@ -440,7 +440,7 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
-    async fn update_history(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+    async fn update_history(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
         let (today_start, today_end, _) = get_utc_day_start(utc_now, 0);
 
         // Check if update is needed
@@ -481,7 +481,7 @@ impl Dispatcher {
 
     /// Updates with data from mygrid base data, schedule, and tariffs.
     ///
-    async fn update_mygrid_data(&mut self) -> Result<(), DispatcherError> {
+    async fn update_mygrid_data(&mut self) -> Result<()> {
         let utc_now = self.utc_now();
 
         self.schedule =  get_schedule(&self.schedule_path).await?;
@@ -519,7 +519,7 @@ impl Dispatcher {
     /// * 'day_start' - start of the day to update tariffs for
     /// * 'day_end' - end of the day to update tariffs for
     /// * 'day_date' - date of the day to update tariffs for
-    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Option<Vec<DataItem<f64>>>>, DispatcherError> {
+    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Option<Vec<DataItem<f64>>>>> {
         let needs_tariff_update = tariffs.as_ref()
             .map(|t| t.first().map_or(true, |d| d.x != day_start))
             .unwrap_or(true);
@@ -542,7 +542,7 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
-    async fn update_real_time_data(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+    async fn update_real_time_data(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
         let timestamp = utc_now.timestamp();
         if timestamp - self.real_time_data.timestamp < 180 { return Ok(())}
             
@@ -578,10 +578,10 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
-    fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<(), DispatcherError> {
+    fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
 
         self.usage_policy = get_policy(
-            utc_now.duration_trunc(TimeDelta::minutes(15))?, 
+            utc_now.duration_trunc(TimeDelta::minutes(15)).context("rounding error")?,
             self.real_time_data.soc,
             &self.schedule,
             &self.policy_tariffs,
@@ -595,7 +595,7 @@ impl Dispatcher {
     /// # Arguments
     /// 
     /// * 'reset_last_request' - whether to reset or not
-    async fn check_updates(&mut self, reset_last_request: bool) -> Result<(), DispatcherError> {
+    async fn check_updates(&mut self, reset_last_request: bool) -> Result<()> {
         let utc_now = self.utc_now();
 
         if reset_last_request {
@@ -697,24 +697,3 @@ fn get_utc_day_start(date_time: DateTime<Utc>, day_index: i64) -> (DateTime<Utc>
     (start.with_timezone(&Utc), end.with_timezone(&Utc), date.date_naive())
 }
 
-#[derive(Debug, Error)]
-pub enum DispatcherError {
-    #[error("MyGridError: {0}")]
-    MyGridError(#[from] MyGridError),
-    #[error("SendError: {0}")]
-    SendError(#[from] tokio::sync::mpsc::error::SendError<String>),
-    #[error("FoxError: {0}")]
-    FoxError(#[from] FoxError),
-    #[error("ChronoParseError: {0}")]
-    ChronoParseError(#[from] chrono::format::ParseError),
-    #[error("ChronoRoundingError: {0}")]
-    RoundingError(#[from] chrono::round::RoundingError),
-    #[error("SerdeJsonError: {0}")]
-    SerdeJsonError(#[from] serde_json::Error),
-    #[error("WeatherError: {0}")]
-    WeatherError(#[from] WeatherError),
-    #[error("NordPoolError: {0}")]
-    NordPoolError(#[from] NordPoolError),
-    #[error("DispatchLoopError: {0}")]
-    DispatchLoopError(String),
-}

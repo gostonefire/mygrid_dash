@@ -16,11 +16,11 @@ use axum::body::Body;
 use tokio::sync::{Mutex, RwLock};
 use chrono::Utc;
 use log::{error, info};
-use thiserror::Error;
+use anyhow::{Context, Result};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tower_http::services::{ServeDir, ServeFile};
-use crate::initialization::{config, Google, ConfigError};
+use crate::initialization::{config, Google};
 use crate::dispatcher::{run, Cmd};
 use crate::handlers::*;
 use crate::manager_tokens::{google_base_data, Tokens};
@@ -52,14 +52,14 @@ struct AppState {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), UnrecoverableError> {
+async fn main() -> Result<()> {
     // Set up communication channels
     let (mut tx_to_mygrid, mut rx_from_web) = mpsc::unbounded_channel::<Cmd>();
     let (mut tx_to_web, mut rx_from_mygrid) = mpsc::unbounded_channel::<String>();
     let comms = Arc::new(Mutex::new(Comms{tx_to_mygrid,rx_from_mygrid,}));
     
     // Load configuration
-    let config = config()?;
+    let config = config().context("failed to load application configuration")?;
     let google_config = Arc::new(RwLock::new(config.google.clone()));
     let session_store: SessionStore = Arc::new(RwLock::new(HashMap::new()));
 
@@ -67,7 +67,7 @@ async fn main() -> Result<(), UnrecoverableError> {
     info!("mygrid_dash version: {}", config.general.version);
 
     // Enrich config
-    google_base_data(google_config.clone()).await.expect("google base data update should succeed");
+    google_base_data(google_config.clone()).await.context("initial Google base data fetch failed")?;
 
     // Purging of old sessions
     info!("starting sessions purge job");
@@ -91,11 +91,15 @@ async fn main() -> Result<(), UnrecoverableError> {
         .layer(middleware::from_fn(cache_control_middleware))
         .with_state(shared_state);
 
-    let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address).expect("invalid BIND_ADDR");
+    let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address)
+        .with_context(|| format!("invalid bind address: {}", config.web_server.bind_address))?;
     let addr = SocketAddr::new(IpAddr::V4(ip_addr), config.web_server.bind_port);
 
-    tokio::spawn(axum_server::bind(addr)
-        .serve(app.into_make_service()));
+    tokio::spawn(async move {
+        if let Err(e) = axum_server::bind(addr).serve(app.into_make_service()).await {
+            error!("web server failed: {:?}", e);
+        }
+    });
 
     // Main dispatch function
     info!("starting main dispatch function");
@@ -184,17 +188,7 @@ async fn update_google_base_data(google_config: Arc<RwLock<Google>>) {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
         if let Err(e) = google_base_data(google_config.clone()).await {
-            error!("error in google_base_data: {}", e);
+            error!("error in google_base_data: {:?}", e);
         }
     }
-}
-
-/// Error representing an unrecoverable error that will halt the application
-///
-#[derive(Debug, Error)]
-pub enum UnrecoverableError {
-    #[error("ConfigError: {0}")]
-    ConfigError(#[from] ConfigError),
-    #[error("std::io::Error: {0}")]
-    IOError(#[from] std::io::Error),
 }
