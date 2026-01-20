@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 
 
@@ -65,8 +65,13 @@ pub enum BlockType {
 pub enum Status {
     Waiting,
     Started,
-    Full(usize),
+    Full(FullAt),
     Error,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FullAt {
+    pub time: DateTime<Utc>,
 }
 
 /// Implementation of the Display Trait for pretty print
@@ -75,7 +80,7 @@ impl fmt::Display for Status {
         match self {
             Status::Waiting => write!(f, "Waiting  "),
             Status::Started => write!(f, "Started  "),
-            Status::Full(soc) => write!(f, "Full: {:>3}", soc),
+            Status::Full(full_at) => write!(f, "Full: {}", full_at.time.with_timezone(&Local).format("%H:%M").to_string()),
             Status::Error   => write!(f, "Error    "),
         }
     }
