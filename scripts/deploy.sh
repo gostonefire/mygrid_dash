@@ -21,6 +21,9 @@ DEV_USER=$(stat -c '%U' "$DEV_DIR")
 
 # Function containing the logic to be run as the directory owner
 run_as_user() {
+  # Load dependencies and cargo environment if it exists
+  source common.sh
+
   run_cmd "mkdir -p $HOME/$APP_DIR/config"       "$SUB_SCRIPT_LOG" "could not create $HOME/$APP_DIR/config..."
   run_cmd "mkdir -p $HOME/$APP_DIR/logs"         "$SUB_SCRIPT_LOG" "could not create $HOME/$APP_DIR/logs..."
   run_cmd "mkdir -p $HOME/$APP_DIR/last_version" "$SUB_SCRIPT_LOG" "could not create $HOME/$APP_DIR/last_version..."
