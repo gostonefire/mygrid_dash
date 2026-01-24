@@ -2,9 +2,10 @@ use std::{env, fs};
 use std::path::PathBuf;
 use chrono::{DateTime, Local};
 use jsonwebtoken::jwk::JwkSet;
-use log::LevelFilter;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+use serde::de;
 use thiserror::Error;
+use tracing::level_filters::LevelFilter;
 use crate::logging::setup_logger;
 
 #[derive(Deserialize, Clone)]
@@ -61,10 +62,38 @@ pub struct Weather {
 pub struct General {
     pub debug_run_time: Option<DateTime<Local>>,
     pub log_path: String,
-    pub log_level: LevelFilter,
+    pub log_level: LogLevel,
     pub log_to_stdout: bool,
     #[serde(default)]
     pub version: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct LogLevel(pub LevelFilter);
+
+impl<'de> Deserialize<'de> for LogLevel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        let normalized = raw.trim().to_ascii_lowercase();
+        let level = match normalized.as_str() {
+            "off" => LevelFilter::OFF,
+            "error" => LevelFilter::ERROR,
+            "warn" | "warning" => LevelFilter::WARN,
+            "info" => LevelFilter::INFO,
+            "debug" => LevelFilter::DEBUG,
+            "trace" => LevelFilter::TRACE,
+            _ => {
+                return Err(de::Error::custom(format!(
+                    "invalid log_level '{raw}', expected off|error|warn|info|debug|trace"
+                )));
+            }
+        };
+
+        Ok(LogLevel(level))
+    }
 }
 
 #[derive(Deserialize, Clone)]
@@ -100,7 +129,7 @@ pub fn config() -> Result<Config, ConfigError> {
         .map(|s| s.trim().to_string())
         .collect::<Vec<String>>();
 
-    setup_logger(&config.general.log_path, config.general.log_level, config.general.log_to_stdout)?;
+    setup_logger(&config.general.log_path, config.general.log_level.0, config.general.log_to_stdout)?;
 
     Ok(config)
 }
@@ -141,13 +170,15 @@ pub enum ConfigError {
     #[error("TomlParseError: {0}")]
     TomlParseError(#[from] toml::de::Error),
     #[error("LoggerSetupError: {0}")]
-    LoggerSetupError(#[from] log::SetLoggerError),
-    #[error("Log4rsConfigErrors: {0}")]
-    Log4rsConfigErrors(#[from] log4rs::config::runtime::ConfigErrors),
+    LoggerSetupError(#[from] tracing::subscriber::SetGlobalDefaultError),
+    #[error("Invalid log_path: expected a file path")]
+    InvalidLogPathError,
     #[error("StringConversionError: {0}")]
     StringConversionError(#[from] alloc::string::FromUtf8Error),
     #[error("EnvVarError: {0}")]
     EnvVarError(#[from] env::VarError),
     #[error("Invalid --config=<config_path> argument")]
     InvalidConfigParameterError,
+    #[error("TracingTryInitError: {0}")]
+    TracingTryInitError(#[from] tracing_subscriber::util::TryInitError),
 }

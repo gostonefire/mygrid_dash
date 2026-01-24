@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::ops::Add;
 use chrono::{DateTime, Duration, DurationRound, Local, NaiveDate, TimeDelta, Timelike, Utc};
-use log::{error, info};
+use tracing::{error, info};
 use serde::Serialize;
 use anyhow::{Result, anyhow, Context};
 use tokio::select;

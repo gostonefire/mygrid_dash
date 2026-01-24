@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use jsonwebtoken::jwk::{AlgorithmParameters, JwkSet};
-use log::info;
+use tracing::info;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

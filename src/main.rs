@@ -15,11 +15,12 @@ use axum::{
 use axum::body::Body;
 use tokio::sync::{Mutex, RwLock};
 use chrono::Utc;
-use log::{error, info};
+use tracing::{error, info};
 use anyhow::{Context, Result};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::trace::TraceLayer;
 use crate::initialization::{config, Google};
 use crate::dispatcher::{run, Cmd};
 use crate::handlers::*;
@@ -89,6 +90,7 @@ async fn main() -> Result<()> {
         .nest_service("/full", ServeFile::new("static/index_full.html"))
         .fallback_service(static_service)
         .layer(middleware::from_fn(cache_control_middleware))
+        .layer(TraceLayer::new_for_http())
         .with_state(shared_state);
 
     let ip_addr = Ipv4Addr::from_str(&config.web_server.bind_address)

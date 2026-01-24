@@ -3,7 +3,7 @@ use axum::http::{header, HeaderName, StatusCode};
 use axum::response::{IntoResponse, Redirect};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use chrono::Utc;
-use log::{error, info};
+use tracing::{error, info};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::AppState;
