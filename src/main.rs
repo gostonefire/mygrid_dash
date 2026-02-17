@@ -28,7 +28,6 @@ use crate::manager_tokens::{google_base_data, Tokens};
 
 mod initialization;
 mod logging;
-mod manager_fox_cloud;
 mod manager_mygrid;
 mod dispatcher;
 mod handlers;

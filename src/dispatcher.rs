@@ -6,8 +6,8 @@ use serde::Serialize;
 use anyhow::{Result, anyhow, Context};
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use foxess::{Fox, FoxVariables};
 use crate::initialization::Config;
-use crate::manager_fox_cloud::Fox;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
 use crate::manager_nordpool::NordPool;
@@ -120,7 +120,7 @@ impl Dispatcher {
     ///
     /// * 'config' - configuration struct
     async fn new(config: &Config) -> Result<Self> {
-        let fox_cloud = Fox::new(&config.fox_ess).context("failed to initialize FoxCloud")?;
+        let fox_cloud = Fox::new(&config.fox_ess.api_key, &config.fox_ess.inverter_sn, 30).context("failed to initialize FoxCloud")?;
         let weather = Weather::new(&config.weather.host, &config.weather.sensor).context("failed to initialize Weather")?;
         let nordpool = NordPool::new().context("failed to initialize NordPool")?;
         let time_delta = if let Some(debug_run_time) = config.general.debug_run_time {
@@ -451,30 +451,26 @@ impl Dispatcher {
         }
 
         info!("updating SoC, pvPower and loadsPower history from FoxESS Cloud");
-        let mut last_end_time: DateTime<Utc> = utc_now;
-        
-        let mut start = today_start;
-        if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end {
-            start = self.history_data.last_end_time.add(TimeDelta::seconds(1));
-            last_end_time = self.history_data.last_end_time;
-        } else {
-            self.history_data.soc_history = Vec::new();
-            self.history_data.prod_history = Vec::new();
-            self.history_data.load_history = Vec::new();
+        let variables = vec![FoxVariables::SoC, FoxVariables::PvPower, FoxVariables::LoadsPower];
+        let history = self.fox_cloud.get_variables_history(today_start, utc_now, variables).await?;
+
+        if let Some(h) = history.get_u8_percent(FoxVariables::SoC) {
+            self.history_data.soc_history = h.iter()
+                .map(|d| DataItem{x: d.date_time, y: d.data})
+                .collect::<Vec<_>>();
+        }
+        if let Some(h) = history.get(FoxVariables::PvPower) {
+            self.history_data.prod_history = h.iter()
+                .map(|d| DataItem{x: d.date_time, y: d.data})
+                .collect::<Vec<_>>();
+        }
+        if let Some(h) = history.get(FoxVariables::LoadsPower) {
+            self.history_data.load_history = h.iter()
+                .map(|d| DataItem{x: d.date_time, y: d.data})
+                .collect::<Vec<_>>();
         }
 
-        if utc_now - start >= TimeDelta::minutes(10) {
-            let history = self.fox_cloud.get_device_history_data(start, utc_now).await?;
-            last_end_time = history.last_end_time;
-            
-            for (i, &date_time) in history.time.iter().enumerate() {
-                self.history_data.soc_history.push(DataItem { x: date_time, y: history.soc[i] });
-                self.history_data.prod_history.push(DataItem { x: date_time, y: history.pv_power[i] });
-                self.history_data.load_history.push(DataItem { x: date_time, y: history.ld_power[i] });
-            }
-        }
-        
-        self.history_data.last_end_time = last_end_time;
+        self.history_data.last_end_time = utc_now;
 
         Ok(())
     }
@@ -552,22 +548,33 @@ impl Dispatcher {
             self.real_time_data.load_data = VecDeque::new();
         }
 
-        let real_time_data = self.fox_cloud.get_device_real_time_data().await?;
-        self.real_time_data.soc = real_time_data.soc;
-        self.real_time_data.soh = real_time_data.soh;
-        
-        if self.real_time_data.prod_data.len() == 3 {
-            self.real_time_data.prod_data.pop_front();
+        let variables = vec![FoxVariables::SoC, FoxVariables::SOH, FoxVariables::PvPower, FoxVariables::LoadsPower];
+        let real_time_data = self.fox_cloud.get_variables(variables).await?;
+
+        if let Some(soc) = real_time_data.get_u8_percent(FoxVariables::SoC) {
+            self.real_time_data.soc = soc;
         }
-        self.real_time_data.prod_data.push_back(real_time_data.pv_power);
-        self.real_time_data.prod = two_decimals(get_wma(&self.real_time_data.prod_data));
-        
-        if self.real_time_data.load_data.len() == 3 {
-            self.real_time_data.load_data.pop_front();
+        if let Some(soh) = real_time_data.get_u8_percent(FoxVariables::SOH) {
+            self.real_time_data.soh = soh;
         }
-        self.real_time_data.load_data.push_back(real_time_data.ld_power);
-        self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
-        
+
+        if let Some(pv_power) = real_time_data.get(FoxVariables::PvPower) {
+            if self.real_time_data.prod_data.len() == 3 {
+                self.real_time_data.prod_data.pop_front();
+            }
+            self.real_time_data.prod_data.push_back(pv_power);
+            self.real_time_data.prod = two_decimals(get_wma(&self.real_time_data.prod_data));
+
+        }
+
+        if let Some(ld_power) = real_time_data.get(FoxVariables::LoadsPower) {
+            if self.real_time_data.load_data.len() == 3 {
+                self.real_time_data.load_data.pop_front();
+            }
+            self.real_time_data.load_data.push_back(ld_power);
+            self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
+        }
+
         self.real_time_data.timestamp = timestamp;
         
         Ok(())
