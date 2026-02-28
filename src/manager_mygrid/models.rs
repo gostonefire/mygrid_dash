@@ -98,6 +98,12 @@ pub struct SourceBlock {
     pub status: Status,
 }
 
+#[derive(Deserialize)]
+pub struct ImportSchedule {
+    pub mode_scheduler: bool,
+    pub blocks: Vec<SourceBlock>,
+}
+
 #[derive(Serialize)]
 pub struct Block {
     pub block_type: BlockType,

@@ -480,7 +480,7 @@ impl Dispatcher {
     async fn update_mygrid_data(&mut self) -> Result<()> {
         let utc_now = self.utc_now();
 
-        self.schedule =  get_schedule(&self.schedule_path).await?;
+        (self.schedule, _) =  get_schedule(&self.schedule_path).await?;
 
         let (day_start, day_end, day_date) = get_utc_day_start(utc_now, 0);
         let (tomorrow_start, tomorrow_end, tomorrow_day_date) = get_utc_day_start(utc_now, 1);

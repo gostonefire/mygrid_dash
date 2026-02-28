@@ -1,7 +1,7 @@
 use std::ops::Add;
 use chrono::{DateTime, Local, TimeDelta, Utc};
 use thiserror::Error;
-use crate::manager_mygrid::models::{BaseData, Block, SourceBlock};
+use crate::manager_mygrid::models::{BaseData, Block, ImportSchedule, SourceBlock};
 use crate::models::{DataItem, MygridData, TariffFees};
 
 pub mod models;
@@ -14,14 +14,14 @@ const BLOCK_UNIT_SIZE: i64 = 15;
 /// # Arguments
 /// 
 /// * 'schedule_path' - full path to the schedule from mygrid
-pub async fn get_schedule(schedule_path: &str) -> Result<Vec<Block>, MyGridError> {
+pub async fn get_schedule(schedule_path: &str) -> Result<(Vec<Block>, bool), MyGridError> {
     let json = tokio::fs::read_to_string(schedule_path).await?;
     
-    let source_blocks: Vec<SourceBlock> = serde_json::from_str(&json)?;
+    let import_schedule: ImportSchedule = serde_json::from_str(&json)?;
 
-    let blocks: Vec<Block> = source_blocks.iter().map(|b| transform_source_block(b)).collect();
+    let blocks: Vec<Block> = import_schedule.blocks.iter().map(|b| transform_source_block(b)).collect();
 
-    Ok(blocks)
+    Ok((blocks, import_schedule.mode_scheduler))
 }
 
 /// Reads base data from mygrid and returns a `BaseData` struct
