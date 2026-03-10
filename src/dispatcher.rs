@@ -478,9 +478,23 @@ impl Dispatcher {
     /// Updates with data from mygrid base data, schedule, and tariffs.
     ///
     async fn update_mygrid_data(&mut self) -> Result<()> {
+        info!("updating MyGrid data and tariffs");
         let utc_now = self.utc_now();
 
-        (self.schedule, _) =  get_schedule(&self.schedule_path).await?;
+        let (mut schedule, _) = get_schedule(&self.schedule_path).await?;
+
+        for block in &mut schedule {
+            let start = block.start_time;
+            let end = block.end_time;
+
+            block.current_soc = self.history_data.soc_history
+                .iter()
+                .filter(|d| (start..=end).contains(&d.x))
+                .map(|d| d.y as usize)
+                .last();
+        }
+
+        self.schedule = schedule;
 
         let (day_start, day_end, day_date) = get_utc_day_start(utc_now, 0);
         let (tomorrow_start, tomorrow_end, tomorrow_day_date) = get_utc_day_start(utc_now, 1);
@@ -553,6 +567,9 @@ impl Dispatcher {
 
         if let Some(soc) = real_time_data.get_u8_percent(FoxVariables::SoC) {
             self.real_time_data.soc = soc;
+            if self.history_data.soc_history.last().is_none_or(|last_soc| last_soc.x < utc_now) {
+                self.history_data.soc_history.push(DataItem { x: utc_now, y: soc });
+            }
         }
         if let Some(soh) = real_time_data.get_u8_percent(FoxVariables::SOH) {
             self.real_time_data.soh = soh;

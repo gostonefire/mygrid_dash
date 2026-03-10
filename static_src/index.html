@@ -131,6 +131,74 @@
             font-size: small;
             color: gainsboro;
         }
+        .soc-cell {
+            min-width: 150px;
+            padding-right: 8px;
+        }
+        .soc-header {
+            text-align: center;
+        }
+        .soc-bar-wrapper {
+            position: relative;
+            width: 100%;
+            min-width: 130px;
+            height: 22px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 4px;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        .soc-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+        }
+
+        .soc-bar-label {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .soc-bar-label-text {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 6px;
+            border: 1px solid rgba(52, 58, 63, 0.8);
+            border-radius: 3px;
+            background-color: rgba(52, 58, 63, 0.55);
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .soc-value-right {
+            display: inline-block;
+            width: 4ch;
+            text-align: left;
+        }
+        .soc-value-left {
+            display: inline-block;
+            width: 4ch;
+            text-align: right;
+        }
+        .soc-separator {
+            display: inline-block;
+            width: 1ch;
+            text-align: center;
+            margin: 0 2px;
+        }
     </style>
 
     <script src="./apexcharts.js"></script>
@@ -173,7 +241,7 @@
                 <td>Length</td>
                 <td>SoC In</td>
                 <td>SoC Out</td>
-                <td>True SoC In</td>
+                <td class="soc-header">True SoC In | Current SoC</td>
                 <td>Cost</td>
                 <td>Status</td>
             </tr>

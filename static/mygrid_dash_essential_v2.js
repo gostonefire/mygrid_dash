@@ -20,6 +20,54 @@ function loadScriptSequentially(file) {
     });
 }
 
+function clampSoc(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+        return null;
+    }
+
+    return Math.max(0, Math.min(100, number));
+}
+
+function getSocBarColor(soc) {
+    if (soc === null) {
+        return 'transparent';
+    }
+
+    if (soc <= 25) {
+        return '#FF4560';
+    }
+
+    if (soc <= 50) {
+        return '#FEB019';
+    }
+
+    return '#00E396';
+}
+
+function renderSocBar(currentSoc, trueSocIn) {
+    const safeCurrentSoc = clampSoc(currentSoc);
+    const safeTrueSocIn = clampSoc(trueSocIn);
+
+    const currentLabel = safeCurrentSoc === null ? '--' : `${Math.round(safeCurrentSoc)}%`;
+    const markerLabel = safeTrueSocIn === null ? '--' : `${Math.round(safeTrueSocIn)}%`;
+    const fillWidth = safeCurrentSoc === null ? 0 : safeCurrentSoc;
+    const fillColor = getSocBarColor(safeCurrentSoc);
+
+    return `
+        <div class="soc-bar-wrapper">
+            <div class="soc-bar-fill" style="width: ${fillWidth}%; background: ${fillColor};"></div>
+            <span class="soc-bar-label">
+                <span class="soc-bar-label-text">
+                    <span class="soc-value-left">${markerLabel}</span>
+                    <span class="soc-separator">|</span>
+                    <span class="soc-value-right">${currentLabel}</span>
+                </span>
+            </span>
+        </div>
+    `;
+}
+
 function refreshData(forceRefresh) {
     const date_now = new Date();
     const now = date_now.getHours() * 60 + date_now.getMinutes();
@@ -94,14 +142,10 @@ function refreshData(forceRefresh) {
         schedule_body.empty();
         for (let i = 0; i < resp.schedule.length; i++) {
             let row = resp.schedule[i];
-            let true_soc_in = '--';
-            if (row.true_soc_in != null) {
-                true_soc_in = row.true_soc_in;
-            }
 
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
-                row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td>' +
-                true_soc_in + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
+                row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td class="soc-cell">' +
+                renderSocBar(row.current_soc, row.true_soc_in) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
 
         $("#version").text("Version: " + resp.version);
