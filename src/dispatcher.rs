@@ -487,11 +487,17 @@ impl Dispatcher {
             let start = block.start_time;
             let end = block.end_time;
 
-            block.current_soc = self.history_data.soc_history
+            let (current_soc, max_soc) = self.history_data.soc_history
                 .iter()
                 .filter(|d| (start..=end).contains(&d.x))
                 .map(|d| d.y as usize)
-                .last();
+                .fold((None, None), |(_, max), y| {
+                    let new_max = Some(max.map_or(y, |m: usize| m.max(y)));
+                    (Some(y), new_max)
+                });
+
+            block.current_soc = current_soc;
+            block.max_soc = max_soc;
         }
 
         self.schedule = schedule;

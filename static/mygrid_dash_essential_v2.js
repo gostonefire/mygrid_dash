@@ -21,6 +21,10 @@ function loadScriptSequentially(file) {
 }
 
 function clampSoc(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
     const number = Number(value);
     if (!Number.isFinite(number)) {
         return null;
@@ -45,18 +49,28 @@ function getSocBarColor(soc) {
     return '#00E396';
 }
 
-function renderSocBar(currentSoc, trueSocIn) {
+function renderSocBar(currentSoc, trueSocIn, maxSoc) {
     const safeCurrentSoc = clampSoc(currentSoc);
     const safeTrueSocIn = clampSoc(trueSocIn);
+    const safeMaxSoc = clampSoc(maxSoc);
 
     const currentLabel = safeCurrentSoc === null ? '--' : `${Math.round(safeCurrentSoc)}%`;
     const markerLabel = safeTrueSocIn === null ? '--' : `${Math.round(safeTrueSocIn)}%`;
+
     const fillWidth = safeCurrentSoc === null ? 0 : safeCurrentSoc;
     const fillColor = getSocBarColor(safeCurrentSoc);
+
+    const maxSocLeft = safeMaxSoc === null || safeMaxSoc <= 0 ? null : Math.max(1, Math.min(99, safeMaxSoc));
+    const maxSocColor = getSocBarColor(safeMaxSoc);
+
+    const maxSocMarker = maxSocLeft === null
+        ? ''
+        : `<div class="soc-bar-max-marker" style="left: ${maxSocLeft}%; background: ${maxSocColor};"></div>`;
 
     return `
         <div class="soc-bar-wrapper">
             <div class="soc-bar-fill" style="width: ${fillWidth}%; background: ${fillColor};"></div>
+            ${maxSocMarker}
             <span class="soc-bar-label">
                 <span class="soc-bar-label-text">
                     <span class="soc-value-left">${markerLabel}</span>
@@ -145,7 +159,7 @@ function refreshData(forceRefresh) {
 
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td class="soc-cell">' +
-                renderSocBar(row.current_soc, row.true_soc_in) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
+                renderSocBar(row.current_soc, row.true_soc_in, row.max_soc) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
 
         $("#version").text("Version: " + resp.version);
