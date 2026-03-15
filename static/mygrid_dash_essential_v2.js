@@ -49,10 +49,11 @@ function getSocBarColor(soc) {
     return '#00E396';
 }
 
-function renderSocBar(currentSoc, trueSocIn, maxSoc) {
+function renderSocBar(currentSoc, trueSocIn, maxSoc, minSoc) {
     const safeCurrentSoc = clampSoc(currentSoc);
     const safeTrueSocIn = clampSoc(trueSocIn);
     const safeMaxSoc = clampSoc(maxSoc);
+    const safeMinSoc = clampSoc(minSoc);
 
     const currentLabel = safeCurrentSoc === null ? '--' : `${Math.round(safeCurrentSoc)}%`;
     const markerLabel = safeTrueSocIn === null ? '--' : `${Math.round(safeTrueSocIn)}%`;
@@ -65,11 +66,20 @@ function renderSocBar(currentSoc, trueSocIn, maxSoc) {
 
     const maxSocMarker = maxSocLeft === null
         ? ''
-        : `<div class="soc-bar-max-marker" style="left: ${maxSocLeft}%; background: ${maxSocColor};"></div>`;
+        : `<div class="soc-bar-minmax-marker" style="left: ${maxSocLeft}%; background: ${maxSocColor};"></div>`;
+
+    const minSocLeft = safeMinSoc === null || safeMinSoc <= 0 ? null : Math.max(1, Math.min(99, safeMinSoc));
+    const minSocColor = '#343a3f';
+
+    const minSocMarker = minSocLeft === null || safeMinSoc === safeCurrentSoc
+        ? ''
+        : `<div class="soc-bar-minmax-marker" style="left: ${minSocLeft}%; background: ${minSocColor};"></div>`;
+
 
     return `
         <div class="soc-bar-wrapper">
             <div class="soc-bar-fill" style="width: ${fillWidth}%; background: ${fillColor};"></div>
+            ${minSocMarker}
             ${maxSocMarker}
             <span class="soc-bar-label">
                 <span class="soc-bar-label-text">
@@ -159,7 +169,7 @@ function refreshData(forceRefresh) {
 
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
                 row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td class="soc-cell">' +
-                renderSocBar(row.current_soc, row.true_soc_in, row.max_soc) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
+                renderSocBar(row.current_soc, row.true_soc_in, row.max_soc, row.min_soc) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
 
         $("#version").text("Version: " + resp.version);

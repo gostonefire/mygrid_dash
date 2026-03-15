@@ -111,6 +111,7 @@ pub struct Block {
     pub true_soc_in: Option<usize>,
     pub current_soc: Option<usize>,
     pub max_soc: Option<usize>,
+    pub min_soc: Option<usize>,
     pub soc_in: usize,
     pub soc_out: usize,
     pub status: String,
