@@ -49,14 +49,14 @@ function getSocBarColor(soc) {
     return '#00E396';
 }
 
-function renderSocBar(currentSoc, trueSocIn, maxSoc, minSoc) {
+function renderSocBar(currentSoc, maxSoc, minSoc) {
     const safeCurrentSoc = clampSoc(currentSoc);
-    const safeTrueSocIn = clampSoc(trueSocIn);
     const safeMaxSoc = clampSoc(maxSoc);
     const safeMinSoc = clampSoc(minSoc);
 
     const currentLabel = safeCurrentSoc === null ? '--' : `${Math.round(safeCurrentSoc)}%`;
-    const markerLabel = safeTrueSocIn === null ? '--' : `${Math.round(safeTrueSocIn)}%`;
+    const minLabel = safeMinSoc === null ? '--' : `${Math.round(safeMinSoc)}%`;
+    const maxLabel = safeMaxSoc === null ? '--' : `${Math.round(safeMaxSoc)}%`;
 
     const fillWidth = safeCurrentSoc === null ? 0 : safeCurrentSoc;
     const fillColor = getSocBarColor(safeCurrentSoc);
@@ -75,7 +75,6 @@ function renderSocBar(currentSoc, trueSocIn, maxSoc, minSoc) {
         ? ''
         : `<div class="soc-bar-minmax-marker" style="left: ${minSocLeft}%; background: ${minSocColor};"></div>`;
 
-
     return `
         <div class="soc-bar-wrapper">
             <div class="soc-bar-fill" style="width: ${fillWidth}%; background: ${fillColor};"></div>
@@ -83,15 +82,16 @@ function renderSocBar(currentSoc, trueSocIn, maxSoc, minSoc) {
             ${maxSocMarker}
             <span class="soc-bar-label">
                 <span class="soc-bar-label-text">
-                    <span class="soc-value-left">${markerLabel}</span>
+                    <span class="soc-value-left">${minLabel}</span>
                     <span class="soc-separator">|</span>
-                    <span class="soc-value-right">${currentLabel}</span>
+                    <span class="soc-value-center">${currentLabel}</span>
+                    <span class="soc-separator">|</span>
+                    <span class="soc-value-right">${maxLabel}</span>
                 </span>
             </span>
         </div>
     `;
 }
-
 function refreshData(forceRefresh) {
     const date_now = new Date();
     const now = date_now.getHours() * 60 + date_now.getMinutes();
@@ -167,9 +167,23 @@ function refreshData(forceRefresh) {
         for (let i = 0; i < resp.schedule.length; i++) {
             let row = resp.schedule[i];
 
+            // Testing max values, remove when done
+            row.true_soc_in = 100;
+            row.soc_in = 100;
+            row.soc_out = 100;
+            row.current_soc = 50;
+            row.max_soc = 100;
+            row.min_soc = 25;
+            // End testing
+
+            const safeTrueSoc = clampSoc(row.true_soc_in);
+            const trueSocLabel = safeTrueSoc === null ? '--' : `${Math.round(safeTrueSoc)}`;
+            const socInLabel = `${row.soc_in} (${trueSocLabel})%`;
+            const socOutLabel = `${row.soc_out}%`;
+
             schedule_body.append('<tr><td>' + row.block_type + '</td><td>' + row.start + '</td><td>' +
-                row.length + '</td><td>' + row.soc_in + '</td><td>' + row.soc_out + '</td><td class="soc-cell">' +
-                renderSocBar(row.current_soc, row.true_soc_in, row.max_soc, row.min_soc) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
+                socInLabel + '</td><td>' + socOutLabel + '</td><td class="soc-cell">' +
+                renderSocBar(row.current_soc, row.max_soc, row.min_soc) + '</td><td>' + row.cost + '</td><td>' + row.status + '</td></tr>');
         }
 
         $("#version").text("Version: " + resp.version);

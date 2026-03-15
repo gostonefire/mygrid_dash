@@ -181,6 +181,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 2px;
             padding: 1px 6px;
             border: 1px solid rgba(52, 58, 63, 0.8);
             border-radius: 3px;
@@ -190,22 +191,26 @@
             font-weight: 600;
             line-height: 1;
             white-space: nowrap;
+            font-variant-numeric: tabular-nums;
         }
-        .soc-value-right {
+        .soc-value-left, .soc-value-center, .soc-value-right {
             display: inline-block;
-            width: 4ch;
-            text-align: left;
+            min-width: 3ch;
         }
         .soc-value-left {
-            display: inline-block;
-            width: 4ch;
             text-align: right;
+        }
+        .soc-value-center {
+            text-align: center;
+        }
+        .soc-value-right {
+            text-align: left;
         }
         .soc-separator {
             display: inline-block;
-            width: 1ch;
             text-align: center;
             margin: 0 2px;
+            opacity: 0.9;
         }
     </style>
 
@@ -241,21 +246,19 @@
         <table class="diagrams" id="schedule">
             <caption style="padding-bottom: 5px"><b>Schedule</b></caption>
             <tr>
-                <td id="schedule-saving" colspan="8">Scheduling saves: --</td>
+                <td id="schedule-saving" colspan="7">Scheduling saves: --</td>
             </tr>
             <tr>
                 <td>Block</td>
                 <td>Start</td>
-                <td>Length</td>
                 <td>SoC In</td>
                 <td>SoC Out</td>
-                <td class="soc-header">True SoC In | Current SoC</td>
+                <td class="soc-header">Min | Current | Max</td>
                 <td>Cost</td>
                 <td>Status</td>
             </tr>
             <tbody id="schedule-body">
                 <tr>
-                    <td>--</td>
                     <td>--</td>
                     <td>--</td>
                     <td>--</td>
