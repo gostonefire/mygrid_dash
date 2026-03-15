@@ -167,15 +167,6 @@ function refreshData(forceRefresh) {
         for (let i = 0; i < resp.schedule.length; i++) {
             let row = resp.schedule[i];
 
-            // Testing max values, remove when done
-            row.true_soc_in = 100;
-            row.soc_in = 100;
-            row.soc_out = 100;
-            row.current_soc = 50;
-            row.max_soc = 100;
-            row.min_soc = 25;
-            // End testing
-
             const safeTrueSoc = clampSoc(row.true_soc_in);
             const trueSocLabel = safeTrueSoc === null ? '--' : `${Math.round(safeTrueSoc)}`;
             const socInLabel = `${row.soc_in} (${trueSocLabel})%`;
