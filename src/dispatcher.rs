@@ -6,8 +6,8 @@ use serde::Serialize;
 use anyhow::{Result, anyhow, Context};
 use tokio::select;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use foxess::{Fox, FoxVariables};
 use crate::initialization::Config;
+use crate::manager_inverter::Inverter;
 use crate::manager_mygrid::{get_base_data, get_schedule};
 use crate::manager_mygrid::models::Block;
 use crate::manager_nordpool::NordPool;
@@ -38,6 +38,10 @@ pub async fn run(tx: UnboundedSender<String>,  rx: UnboundedReceiver<Cmd>, confi
             return;
         }
     };
+
+    if let Err(e) = &disp.check_updates(true).await {
+        error!("while checking for updates: {:?}", e);
+    }
     if let Err(e) = &disp.update_mygrid_data().await {
         error!("while updating mygrid data: {:?}", e);
     }
@@ -59,7 +63,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
     let (tx_sleep, mut rx_sleep) = tokio::sync::mpsc::unbounded_channel::<bool>();
     tokio::spawn(async move {
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(180)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             tx_sleep.send(true).unwrap();
         }
     });
@@ -95,7 +99,7 @@ async fn dispatch_loop(tx: UnboundedSender<String>, mut rx: UnboundedReceiver<Cm
 struct Dispatcher {
     schedule: Vec<Block>,
     mygrid_data: MygridData,
-    fox_cloud: Fox,
+    inverter: Inverter,
     weather: Weather,
     nordpool: NordPool,
     schedule_path: String,
@@ -109,6 +113,7 @@ struct Dispatcher {
     max_tariff: u8,
     usage_policy: TariffColor,
     last_request: i64,
+    last_update: i64,
     time_delta: TimeDelta,
     version: String,
 }
@@ -120,7 +125,7 @@ impl Dispatcher {
     ///
     /// * 'config' - configuration struct
     async fn new(config: &Config) -> Result<Self> {
-        let fox_cloud = Fox::new(&config.fox_ess.api_key, &config.fox_ess.inverter_sn, 30).context("failed to initialize FoxCloud")?;
+        let inverter = Inverter::new(&config.inverter.host).context("failed to initialize Inverter")?;
         let weather = Weather::new(&config.weather.host, &config.weather.sensor).context("failed to initialize Weather")?;
         let nordpool = NordPool::new().context("failed to initialize NordPool")?;
         let time_delta = if let Some(debug_run_time) = config.general.debug_run_time {
@@ -149,7 +154,7 @@ impl Dispatcher {
                     fixed: 0.0,
                 },
             },
-            fox_cloud,
+            inverter,
             weather,
             nordpool,
             schedule_path: config.mygrid.schedule_path.clone(),
@@ -158,7 +163,6 @@ impl Dispatcher {
                 soc_history: Vec::new(),
                 prod_history: Vec::new(),
                 load_history: Vec::new(),
-                last_end_time: Default::default(),
             },
             real_time_data: RealTimeData {
                 soc: 0,
@@ -189,6 +193,7 @@ impl Dispatcher {
             max_tariff: 0,
             usage_policy: TariffColor::Green,
             last_request: 0,
+            last_update: 0,
             time_delta,
             version: config.general.version.clone(),
         })
@@ -441,36 +446,20 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     async fn update_history(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
-        let (today_start, today_end, _) = get_utc_day_start(utc_now, 0);
+        let (today_start, _today_end, _) = get_utc_day_start(utc_now, 0);
+        info!("updating SoC, pvPower and loadsPower history from inverter");
 
-        // Check if update is needed
-        if self.history_data.last_end_time >= today_start &&  self.history_data.last_end_time < today_end &&
-            utc_now - self.history_data.last_end_time <= Duration::minutes(10) 
-        {
-            return Ok(())
-        }
+        let history = self.inverter.get_history(today_start, utc_now, 5).await?;
 
-        info!("updating SoC, pvPower and loadsPower history from FoxESS Cloud");
-        let variables = vec![FoxVariables::SoC, FoxVariables::PvPower, FoxVariables::LoadsPower];
-        let history = self.fox_cloud.get_variables_history(today_start, utc_now, variables).await?;
+        self.history_data.soc_history = Vec::new();
+        self.history_data.prod_history = Vec::new();
+        self.history_data.load_history = Vec::new();
 
-        if let Some(h) = history.get_u8_percent(FoxVariables::SoC) {
-            self.history_data.soc_history = h.iter()
-                .map(|d| DataItem{x: d.date_time, y: d.data})
-                .collect::<Vec<_>>();
+        for sample in history.samples {
+            self.history_data.soc_history.push(DataItem{x: sample.ts, y: sample.batt_soc.round() as u8});
+            self.history_data.prod_history.push(DataItem{x: sample.ts, y: sample.production});
+            self.history_data.load_history.push(DataItem{x: sample.ts, y: sample.consumption});
         }
-        if let Some(h) = history.get(FoxVariables::PvPower) {
-            self.history_data.prod_history = h.iter()
-                .map(|d| DataItem{x: d.date_time, y: d.data})
-                .collect::<Vec<_>>();
-        }
-        if let Some(h) = history.get(FoxVariables::LoadsPower) {
-            self.history_data.load_history = h.iter()
-                .map(|d| DataItem{x: d.date_time, y: d.data})
-                .collect::<Vec<_>>();
-        }
-
-        self.history_data.last_end_time = utc_now;
 
         Ok(())
     }
@@ -562,43 +551,29 @@ impl Dispatcher {
     /// * 'utc_now' - 'now' according to the Utc timezone
     async fn update_real_time_data(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
         let timestamp = utc_now.timestamp();
-        if timestamp - self.real_time_data.timestamp < 180 { return Ok(())}
-            
+
         info!("updating real time data");
         if timestamp - self.real_time_data.timestamp > 600 {
             self.real_time_data.prod_data = VecDeque::new();
             self.real_time_data.load_data = VecDeque::new();
         }
 
-        let variables = vec![FoxVariables::SoC, FoxVariables::SOH, FoxVariables::PvPower, FoxVariables::LoadsPower];
-        let real_time_data = self.fox_cloud.get_variables(variables).await?;
+        self.real_time_data.soc = self.inverter.get_soc().await?;
+        self.real_time_data.soh = self.inverter.get_soh().await?;
+        let pv_power = self.inverter.get_pv_power().await?;
+        let load_power = self.inverter.get_load_power().await?;
 
-        if let Some(soc) = real_time_data.get_u8_percent(FoxVariables::SoC) {
-            self.real_time_data.soc = soc;
-            if self.history_data.soc_history.last().is_none_or(|last_soc| last_soc.x < utc_now) {
-                self.history_data.soc_history.push(DataItem { x: utc_now, y: soc });
-            }
+        if self.real_time_data.prod_data.len() == 3 {
+            self.real_time_data.prod_data.pop_front();
         }
-        if let Some(soh) = real_time_data.get_u8_percent(FoxVariables::SOH) {
-            self.real_time_data.soh = soh;
-        }
+        self.real_time_data.prod_data.push_back(pv_power);
+        self.real_time_data.prod = two_decimals(get_wma(&self.real_time_data.prod_data));
 
-        if let Some(pv_power) = real_time_data.get(FoxVariables::PvPower) {
-            if self.real_time_data.prod_data.len() == 3 {
-                self.real_time_data.prod_data.pop_front();
-            }
-            self.real_time_data.prod_data.push_back(pv_power);
-            self.real_time_data.prod = two_decimals(get_wma(&self.real_time_data.prod_data));
-
+        if self.real_time_data.load_data.len() == 3 {
+            self.real_time_data.load_data.pop_front();
         }
-
-        if let Some(ld_power) = real_time_data.get(FoxVariables::LoadsPower) {
-            if self.real_time_data.load_data.len() == 3 {
-                self.real_time_data.load_data.pop_front();
-            }
-            self.real_time_data.load_data.push_back(ld_power);
-            self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
-        }
+        self.real_time_data.load_data.push_back(load_power);
+        self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
 
         self.real_time_data.timestamp = timestamp;
         
@@ -622,25 +597,32 @@ impl Dispatcher {
         Ok(())
     }
     
-    /// Check if it is time to update data from FoxESS
+    /// Check if it is time to update data
     /// 
     /// # Arguments
     /// 
     /// * 'reset_last_request' - whether to reset or not
     async fn check_updates(&mut self, reset_last_request: bool) -> Result<()> {
         let utc_now = self.utc_now();
+        let timestamp = utc_now.timestamp();
 
         if reset_last_request {
-            self.last_request = utc_now.timestamp();
+            self.last_request = timestamp;
         }
-        
-        if utc_now.timestamp() - self.last_request <= 1800 {
+
+        if timestamp - self.last_update < 60 {
+            return Ok(())
+        }
+
+        if timestamp - self.last_request <= 1800 {
             let _ = self.update_weather(utc_now).await?;
             let _ = self.update_real_time_data(utc_now).await?;
             let _ = self.update_history(utc_now).await?;
             let _ = self.evaluate_policy(utc_now)?;
+            self.last_update = timestamp;
         }
-        
+
+
         Ok(())
     }
 

@@ -62,7 +62,6 @@ pub struct HistoryData {
     pub soc_history: Vec<DataItem<u8>>,
     pub prod_history: Vec<DataItem<f64>>,
     pub load_history: Vec<DataItem<f64>>,
-    pub last_end_time: DateTime<Utc>
 }
 
 pub struct RealTimeData {

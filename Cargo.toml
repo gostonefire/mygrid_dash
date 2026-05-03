@@ -1,6 +1,6 @@
 [package]
 name = "mygrid_dash"
-version = "2.9.5"
+version = "2.9.6"
 edition = "2024"
 
 build = "build.rs"
@@ -24,4 +24,3 @@ uuid = {version = "1.22", features = ["v4"]}
 jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 anyhow = "1.0"
 thiserror = "2.0"
-foxess = "1.0"

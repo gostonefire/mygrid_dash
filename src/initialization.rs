@@ -39,11 +39,8 @@ pub struct WebServerParameters {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct FoxESS {
-    #[serde(default)]
-    pub api_key: String,
-    #[serde(default)]
-    pub inverter_sn: String,
+pub struct Inverter {
+    pub host: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -100,7 +97,7 @@ impl<'de> Deserialize<'de> for LogLevel {
 pub struct Config {
     pub google: Google,
     pub web_server: WebServerParameters,
-    pub fox_ess: FoxESS,
+    pub inverter: Inverter,
     pub mygrid: MyGrid,
     pub weather: Weather,
     pub general: General,
@@ -122,8 +119,6 @@ pub fn config() -> Result<Config, ConfigError> {
     config.general.version = env!("CARGO_PKG_VERSION").to_string();
     config.google.client_id = read_credential("google_client_id")?;
     config.google.client_secret = read_credential("google_client_secret")?;
-    config.fox_ess.api_key = read_credential("fox_ess_api_key")?;
-    config.fox_ess.inverter_sn = read_credential("fox_ess_inverter_sn")?;
     config.google.users = read_credential("google_users")?
         .split(',')
         .map(|s| s.trim().to_string())

@@ -7,7 +7,8 @@ well_known        = "https://accounts.google.com/.well-known/openid-configuratio
 bind_address      = "192.168.1.136"
 bind_port         = 8085
 
-[fox_ess]
+[inverter]
+host              = "zeroshed.gridfire.org:8080"
 
 [mygrid]
 schedule_path     = "/home/petste/MyGridScheduler/schedule/schedule.json"     # path to the schedule file
