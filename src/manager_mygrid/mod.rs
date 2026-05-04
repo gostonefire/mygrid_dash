@@ -50,6 +50,7 @@ pub async fn get_base_data(base_data_path: &str, utc_now: DateTime<Utc>, day_sta
             electric_certificate: 0.0,
             guarantees_of_origin: 0.0,
             fixed: 0.0,
+            production_price: 0.0,
         },
     };
 
@@ -67,6 +68,7 @@ pub async fn get_base_data(base_data_path: &str, utc_now: DateTime<Utc>, day_sta
         mygrid.tariff_fees.electric_certificate = base_data.tariff_fees.electric_certificate;
         mygrid.tariff_fees.guarantees_of_origin = base_data.tariff_fees.guarantees_of_origin;
         mygrid.tariff_fees.fixed = base_data.tariff_fees.fixed;
+        mygrid.tariff_fees.production_price = base_data.tariff_fees.production_price;
 
         base_data.forecast.into_iter().filter(|f| f.date_time >= day_start && f.date_time < day_end).for_each(|f| {
             mygrid.forecast_temp.push(DataItem { x: f.date_time, y: f.temp });

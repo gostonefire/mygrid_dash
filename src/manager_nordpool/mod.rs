@@ -26,14 +26,14 @@ impl NordPool {
     }
 
     /// Retrieves day ahead prices from NordPool
-    /// It gets the tariffs for the day indicated by date_time (if it can't an error will be returned),
+    /// It gets the buy and sell tariffs for the day indicated by date_time (if it can't, an error will be returned),
     ///
     /// # Arguments
     ///
     /// * 'day_start' - the start time of the day to retrieve prices for
     /// * 'day_end' - the end time of the day to retrieve prices for (non-inclusive)
     /// * 'day_date' - the date to retrieve prices for
-    pub async fn get_tariffs(&self, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Vec<DataItem<f64>>>, NordPoolError> {
+    pub async fn get_tariffs(&self, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<(Vec<DataItem<f64>>, Vec<DataItem<f64>>)>, NordPoolError> {
         if self.tariff_fees.is_some() {
             let day_date_utc = TimeZone::from_utc_datetime(&Utc, &day_date.and_hms_opt(0,0,0).unwrap());
             match self.get_day_tariffs(day_start, day_end, day_date_utc).await {
@@ -63,7 +63,7 @@ impl NordPool {
     /// * 'day_start' - the start time of the day to retrieve prices for
     /// * 'day_end' - the end time of the day to retrieve prices for (non-inclusive)
     /// * 'day_date' - the date to retrieve prices for
-    async fn get_day_tariffs(&self, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: DateTime<Utc>) -> Result<Vec<DataItem<f64>>, NordPoolError> {
+    async fn get_day_tariffs(&self, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: DateTime<Utc>) -> Result<(Vec<DataItem<f64>>, Vec<DataItem<f64>>), NordPoolError> {
         // https://dataportal-api.nordpoolgroup.com/api/DayAheadPrices?date=2025-10-22&market=DayAhead&deliveryArea=SE4&currency=SEK
         let url = "https://dataportal-api.nordpoolgroup.com/api/DayAheadPrices";
         let date = format!("{}", day_date.format("%Y-%m-%d"));
@@ -87,37 +87,42 @@ impl NordPool {
         self.tariffs_to_vec(&tariffs, day_start, day_end)
     }
 
-    /// Transforms the Tariffs struct to a plain vector of prices
+    /// Transforms the Tariffs struct to a plain vector of prices, one for buy and one for sell)
     ///
     /// # Arguments
     ///
     /// * 'tariffs' - the struct containing prices
     /// * 'day_start' - start of day to transform tariffs for
     /// * 'day_end' - end of day to transform tariffs for (non-inclusive)
-    fn tariffs_to_vec(&self, tariffs: &Tariffs, day_start: DateTime<Utc>, day_end: DateTime<Utc>) -> Result<Vec<DataItem<f64>>, NordPoolError> {
+    fn tariffs_to_vec(&self, tariffs: &Tariffs, day_start: DateTime<Utc>, day_end: DateTime<Utc>) -> Result<(Vec<DataItem<f64>>, Vec<DataItem<f64>>), NordPoolError> {
         let entries = tariffs.multi_area_entries.len();
         if entries < 92 {
             return Err(NordPoolError::ContentLengthError)?
         }
         let day_avg = tariffs.multi_area_entries.iter().map(|t| t.entry_per_area.se4).sum::<f64>() / entries as f64 / 1000.0;
 
-        let mut result: Vec<DataItem<f64>> = Vec::new();
+        let mut result_buy: Vec<DataItem<f64>> = Vec::new();
+        let mut result_sell: Vec<DataItem<f64>> = Vec::new();
         tariffs.multi_area_entries.iter().filter(|t| t.delivery_start >= day_start && t.delivery_start < day_end).for_each(
             |t| {
-                result.push(self.add_vat_markup(day_avg, t.entry_per_area.se4, t.delivery_start));
+                let (buy, sell) = self.add_vat_markup(day_avg, t.entry_per_area.se4, t.delivery_start);
+                result_buy.push(buy);
+                result_sell.push(sell);
             });
 
-        Ok(result)
+        Ok((result_buy, result_sell))
     }
 
     /// Adds VAT and other markups such as energy taxes etc.
+    ///
+    /// It delivers a tuple containing the buy and sell prices for the tariff.
     ///
     /// # Arguments
     ///
     /// * 'day_avg' - average tariff for the day as from NordPool in SEK/MWh
     /// * 'tariff' - spot fee as from NordPool in SEK/MWh
     /// * 'delivery_start' - start time for the spot
-    fn add_vat_markup(&self, day_avg: f64, tariff: f64, delivery_start: DateTime<Utc>) -> DataItem<f64> {
+    fn add_vat_markup(&self, day_avg: f64, tariff: f64, delivery_start: DateTime<Utc>) -> (DataItem<f64>, DataItem<f64>) {
         let fees = self.tariff_fees.as_ref().unwrap();
 
         let price = tariff / 1000.0; // SEK per MWh to per kWh
@@ -126,8 +131,12 @@ impl NordPool {
             fees.guarantees_of_origin + fees.fixed) / 100.0 + price;
 
         let buy = (grid_fees + trade_fees) / 0.8;
+        let sell = fees.production_price / 100.0 + price;
 
-        DataItem { x: delivery_start, y: round_to_two_decimals(buy) }
+        (
+            DataItem { x: delivery_start, y: round_to_two_decimals(buy) },
+            DataItem { x: delivery_start, y: round_to_two_decimals(sell) }
+        )
     }
 }
 

@@ -84,6 +84,7 @@ pub struct TariffFees {
     pub electric_certificate: f64,
     pub guarantees_of_origin: f64,
     pub fixed: f64,
+    pub production_price: f64,
 }
 
 pub struct MygridData {

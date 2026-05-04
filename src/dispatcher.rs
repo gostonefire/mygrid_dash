@@ -109,6 +109,7 @@ struct Dispatcher {
     weather_data: WeatherData,
     today_tariffs: Option<Vec<DataItem<f64>>>,
     tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
+    today_tariffs_sell: Option<Vec<DataItem<f64>>>,
     policy_tariffs: HashMap<DateTime<Utc>, f64>,
     max_tariff: u8,
     usage_policy: TariffColor,
@@ -152,6 +153,7 @@ impl Dispatcher {
                     electric_certificate: 0.0,
                     guarantees_of_origin: 0.0,
                     fixed: 0.0,
+                    production_price: 0.0,
                 },
             },
             inverter,
@@ -189,6 +191,7 @@ impl Dispatcher {
             },
             today_tariffs: None,
             tomorrow_tariffs: None,
+            today_tariffs_sell: None,
             policy_tariffs: HashMap::new(),
             max_tariff: 0,
             usage_policy: TariffColor::Green,
@@ -500,18 +503,25 @@ impl Dispatcher {
         self.nordpool.set_tariff_fees(self.mygrid_data.tariff_fees.clone());
 
         self.update_tariffs_if_needed(&self.today_tariffs, day_start, day_end, day_date).await?
-            .map(|t| {
-                self.today_tariffs = t;
+            .map(|tariffs| {
+                let (t_buy, t_sell) = if let Some((t_buy, t_sell)) = tariffs {
+                    (Some(t_buy), Some(t_sell))
+                } else {
+                    (None, None)
+                };
+
+                self.today_tariffs = t_buy;
+                self.today_tariffs_sell = t_sell;
                 self.policy_tariffs = self.today_tariffs
                     .as_ref()
                     .map(|v| v.iter()
-                        .map(|t| (t.x, t.y))
+                        .map(|t_buy| (t_buy.x, t_buy.y))
                         .collect())
                     .unwrap_or_default();
             });
 
         self.update_tariffs_if_needed(&self.tomorrow_tariffs, tomorrow_start, tomorrow_end, tomorrow_day_date).await?
-            .map(|t| self.tomorrow_tariffs = t);
+            .map(|tariffs| self.tomorrow_tariffs = tariffs.map(|tariffs| tariffs.0));
 
         self.max_tariff = self.max_tariff();
 
@@ -526,7 +536,7 @@ impl Dispatcher {
     /// * 'day_start' - start of the day to update tariffs for
     /// * 'day_end' - end of the day to update tariffs for
     /// * 'day_date' - date of the day to update tariffs for
-    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Option<Vec<DataItem<f64>>>>> {
+    async fn update_tariffs_if_needed(&self, tariffs: &Option<Vec<DataItem<f64>>>, day_start: DateTime<Utc>, day_end: DateTime<Utc>, day_date: NaiveDate) -> Result<Option<Option<(Vec<DataItem<f64>>, Vec<DataItem<f64>>)>>> {
         let needs_tariff_update = tariffs.as_ref()
             .map(|t| t.first().map_or(true, |d| d.x != day_start))
             .unwrap_or(true);
