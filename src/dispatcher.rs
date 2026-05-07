@@ -109,9 +109,11 @@ struct Dispatcher {
     weather_data: WeatherData,
     today_tariffs: Option<Vec<DataItem<f64>>>,
     tomorrow_tariffs: Option<Vec<DataItem<f64>>>,
-    today_tariffs_sell: Option<Vec<DataItem<f64>>>,
+    today_tariffs_sell: Option<HashMap<DateTime<Utc>,f64>>,
     policy_tariffs: HashMap<DateTime<Utc>, f64>,
     max_tariff: u8,
+    today_bought: f64,
+    today_sold: f64,
     usage_policy: TariffColor,
     last_request: i64,
     last_update: i64,
@@ -194,6 +196,8 @@ impl Dispatcher {
             today_tariffs_sell: None,
             policy_tariffs: HashMap::new(),
             max_tariff: 0,
+            today_bought: 0.0,
+            today_sold: 0.0,
             usage_policy: TariffColor::Green,
             last_request: 0,
             last_update: 0,
@@ -236,6 +240,8 @@ impl Dispatcher {
             schedule: &'a Vec<Block>,
             base_cost: f64,
             schedule_cost: f64,
+            today_sold: f64,
+            today_bought: f64,
             time_delta: i64,
             version: &'a String,
         }
@@ -291,6 +297,8 @@ impl Dispatcher {
             schedule: &self.schedule,
             base_cost: self.mygrid_data.base_cost,
             schedule_cost: self.mygrid_data.schedule_cost,
+            today_sold: self.today_sold,
+            today_bought: self.today_bought,
             time_delta: self.time_delta.num_milliseconds(),
             version: &self.version,
         };
@@ -464,6 +472,31 @@ impl Dispatcher {
             self.history_data.load_history.push(DataItem{x: sample.ts, y: sample.consumption});
         }
 
+        if self.today_tariffs_sell.is_some() && self.today_tariffs.is_some() && utc_now.minute() % 15 == 1 {
+            let energy_intervals = self.inverter.get_energy_intervals(today_start, utc_now).await?;
+            let tariffs_sell = self.today_tariffs_sell.as_ref().unwrap();
+            let tariffs_buy = self.today_tariffs
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|t_buy| (t_buy.x, t_buy.y))
+                .collect::<HashMap<DateTime<Utc>, f64>>();
+
+            let mut sold: f64 = 0.0;
+            let mut bought: f64 = 0.0;
+
+            for interval in energy_intervals.intervals {
+                let tariff_buy = *tariffs_buy.get(&interval.from_ts).unwrap_or(&0.0);
+                let tariff_sell = *tariffs_sell.get(&interval.from_ts).unwrap_or(&0.0);
+
+                sold += interval.feed_in_energy * tariff_sell;
+                bought += interval.grid_consumption_energy * tariff_buy;
+            }
+
+            self.today_sold = two_decimals(sold);
+            self.today_bought = two_decimals(bought);
+        }
+
         Ok(())
     }
 
@@ -511,7 +544,10 @@ impl Dispatcher {
                 };
 
                 self.today_tariffs = t_buy;
-                self.today_tariffs_sell = t_sell;
+                self.today_tariffs_sell = t_sell.map(|t_sell| {
+                    t_sell.iter().map(|t_sell| (t_sell.x, t_sell.y)).collect::<HashMap<DateTime<Utc>, f64>>()
+                });
+
                 self.policy_tariffs = self.today_tariffs
                     .as_ref()
                     .map(|v| v.iter()

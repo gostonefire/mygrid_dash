@@ -4,7 +4,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use thiserror::Error;
-use crate::manager_inverter::models::{DataRecord, HistoryRecord};
+use crate::manager_inverter::models::{DataRecord, EnergyIntervalsRecord, HistoryRecord};
 
 pub struct Inverter {
     client: Client,
@@ -75,7 +75,7 @@ impl Inverter {
     /// * `to` - end timestamp for the query
     /// * `interval` - interval between samples in minutes (i.e., bucket size)
     pub async fn get_history(&self, from: DateTime<Utc>, to: DateTime<Utc>, interval: i64) -> Result<HistoryRecord, InverterError> {
-        let url = format!("http://{}/history?from_ts={}&to_ts={}&interval={}", self.host, from.timestamp(), to.timestamp(), interval);
+        let url = format!("http://{}/history", self.host);
         
         let from_ts = from.timestamp();
         let to_ts = to.timestamp();
@@ -93,6 +93,33 @@ impl Inverter {
         let history: HistoryRecord = serde_json::from_str(&json)?;
         
         Ok(history)
+    }
+
+    /// Requests energy intervals records from the inverter.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `from` - start timestamp for the query
+    /// * `to` - end timestamp for the query
+    pub async fn get_energy_intervals(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<EnergyIntervalsRecord, InverterError> {
+        let url = format!("http://{}/energy-intervals", self.host);
+        
+        let from_ts = from.timestamp();
+        let to_ts = to.timestamp();
+        
+        let req = self.client.get(&url)
+            .query(&[("from_ts", from_ts), ("to_ts", to_ts)])
+            .send().await?;
+        
+        let status = req.status();
+        if !status.is_success() {
+            return Err(InverterError::InverterError(format!("response with status: {:?}", status)));
+        }
+        
+        let json = req.text().await?;
+        let intervals: EnergyIntervalsRecord = serde_json::from_str(&json)?;
+        
+        Ok(intervals)
     }
 }
 

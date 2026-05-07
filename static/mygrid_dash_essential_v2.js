@@ -160,7 +160,14 @@ function refreshData(forceRefresh) {
             $("#tariffs-buy-tomorrow").hide();
         }
 
-        $("#schedule-saving").text("Scheduling saves: " + (resp.base_cost - resp.schedule_cost).toFixed(2));
+        const schedule_saves = "Scheduling saves: " + (resp.base_cost - resp.schedule_cost).toFixed(2) + "kr";
+        const today_bought = "Today bought: " + resp.today_bought.toFixed(2) + "kr";
+        const today_sold = "Today sold: " + resp.today_sold.toFixed(2) + "kr";
+
+        $("#schedule-saves").text(schedule_saves);
+        $("#today-bought").text(today_bought);
+        $("#today-sold").text(today_sold);
+
         let schedule_body = $('#schedule-body');
 
         schedule_body.empty();

@@ -120,6 +120,25 @@
             padding-bottom: 2px;
             color: whitesmoke;
         }
+        .schedule-saving-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            width: 100%;
+        }
+        #schedule-saves {
+            text-align: left;
+        }
+        #today-bought {
+            text-align: center;
+        }
+        #today-sold {
+            text-align: right;
+        }
+        .symbol-text {
+            margin: 0;
+            color: whitesmoke;
+            font-size: 12px;
+        }
         .symbol-text {
             margin: 0;
             color: whitesmoke;
@@ -246,7 +265,13 @@
         <table class="diagrams" id="schedule">
             <caption style="padding-bottom: 5px"><b>Schedule</b></caption>
             <tr>
-                <td id="schedule-saving" colspan="7">Scheduling saves: --</td>
+                <td id="schedule-saving" colspan="7">
+                    <div class="schedule-saving-row">
+                        <span id="schedule-saves">Scheduling saves: --</span>
+                        <span id="today-bought">Today bought: --</span>
+                        <span id="today-sold">Today sold: --</span>
+                    </div>
+                </td>
             </tr>
             <tr>
                 <td>Block</td>
