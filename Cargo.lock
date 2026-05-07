@@ -932,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "mygrid_dash"
-version = "2.9.7"
+version = "2.9.8"
 dependencies = [
  "anyhow",
  "axum",
