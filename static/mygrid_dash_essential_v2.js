@@ -161,8 +161,8 @@ function refreshData(forceRefresh) {
         }
 
         const schedule_saves = "Scheduling saves: " + (resp.base_cost - resp.schedule_cost).toFixed(2) + "kr";
-        const today_bought = "Today bought: " + resp.today_bought.toFixed(2) + "kr";
-        const today_sold = "Today sold: " + resp.today_sold.toFixed(2) + "kr";
+        const today_bought = "Imported: " + resp.today_bought.toFixed(2) + "kr (" + resp.today_imported.toFixed(2) + "kWh)";
+        const today_sold = "Exported: " + resp.today_sold.toFixed(2) + "kr (" + resp.today_exported.toFixed(2) + "kWh)";
 
         $("#schedule-saves").text(schedule_saves);
         $("#today-bought").text(today_bought);

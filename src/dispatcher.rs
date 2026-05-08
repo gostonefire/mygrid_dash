@@ -114,6 +114,8 @@ struct Dispatcher {
     max_tariff: u8,
     today_bought: f64,
     today_sold: f64,
+    exported_energy: f64,
+    imported_energy: f64,
     usage_policy: TariffColor,
     last_request: i64,
     last_update: i64,
@@ -198,6 +200,8 @@ impl Dispatcher {
             max_tariff: 0,
             today_bought: 0.0,
             today_sold: 0.0,
+            exported_energy: 0.0,
+            imported_energy: 0.0,
             usage_policy: TariffColor::Green,
             last_request: 0,
             last_update: 0,
@@ -242,6 +246,8 @@ impl Dispatcher {
             schedule_cost: f64,
             today_sold: f64,
             today_bought: f64,
+            today_exported: f64,
+            today_imported: f64,
             time_delta: i64,
             version: &'a String,
         }
@@ -299,6 +305,8 @@ impl Dispatcher {
             schedule_cost: self.mygrid_data.schedule_cost,
             today_sold: self.today_sold,
             today_bought: self.today_bought,
+            today_exported: self.exported_energy,
+            today_imported: self.imported_energy,
             time_delta: self.time_delta.num_milliseconds(),
             version: &self.version,
         };
@@ -484,6 +492,8 @@ impl Dispatcher {
 
             let mut sold: f64 = 0.0;
             let mut bought: f64 = 0.0;
+            let mut exported_energy: f64 = 0.0;
+            let mut imported_energy: f64 = 0.0;
 
             for interval in energy_intervals.intervals {
                 let tariff_buy = *tariffs_buy.get(&interval.from_ts).unwrap_or(&0.0);
@@ -491,10 +501,14 @@ impl Dispatcher {
 
                 sold += interval.feed_in_energy * tariff_sell;
                 bought += interval.grid_consumption_energy * tariff_buy;
+                exported_energy += interval.feed_in_energy;
+                imported_energy += interval.grid_consumption_energy;
             }
 
             self.today_sold = two_decimals(sold);
             self.today_bought = two_decimals(bought);
+            self.exported_energy = two_decimals(exported_energy);
+            self.imported_energy = two_decimals(imported_energy);
         }
 
         Ok(())
