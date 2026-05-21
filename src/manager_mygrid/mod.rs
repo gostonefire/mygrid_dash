@@ -14,14 +14,14 @@ const BLOCK_UNIT_SIZE: i64 = 15;
 /// # Arguments
 /// 
 /// * 'schedule_path' - full path to the schedule from mygrid
-pub async fn get_schedule(schedule_path: &str) -> Result<(Vec<Block>, bool), MyGridError> {
+pub async fn get_schedule(schedule_path: &str) -> Result<Vec<Block>, MyGridError> {
     let json = tokio::fs::read_to_string(schedule_path).await?;
     
     let import_schedule: ImportSchedule = serde_json::from_str(&json)?;
 
     let blocks: Vec<Block> = import_schedule.blocks.iter().map(|b| transform_source_block(b)).collect();
 
-    Ok((blocks, import_schedule.mode_scheduler))
+    Ok(blocks)
 }
 
 /// Reads base data from mygrid and returns a `BaseData` struct

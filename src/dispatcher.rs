@@ -520,7 +520,7 @@ impl Dispatcher {
         info!("updating MyGrid data and tariffs");
         let utc_now = self.utc_now();
 
-        let (mut schedule, _) = get_schedule(&self.schedule_path).await?;
+        let mut schedule = get_schedule(&self.schedule_path).await?;
 
         for block in &mut schedule {
             let start = block.start_time;
