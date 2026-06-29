@@ -647,7 +647,7 @@ impl Dispatcher {
     /// # Arguments
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
-    fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
+    async fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
         let current_quarter = utc_now
             .duration_trunc(TimeDelta::minutes(15))
             .context("rounding error")?;
@@ -659,11 +659,15 @@ impl Dispatcher {
             return Ok(());
         }
 
+        let grid_power = self.inverter.get_grid_power().await?;
+        println!("Grid power: {}", grid_power);
+        
         self.usage_policy = get_policy(
             current_quarter,
             self.real_time_data.soc,
             &self.schedule,
             &self.policy_tariffs,
+            grid_power,
         );
 
         self.last_policy_update = utc_now;
@@ -691,7 +695,7 @@ impl Dispatcher {
             let _ = self.update_weather(utc_now).await?;
             let _ = self.update_real_time_data(utc_now).await?;
             let _ = self.update_history(utc_now).await?;
-            let _ = self.evaluate_policy(utc_now)?;
+            let _ = self.evaluate_policy(utc_now).await?;
             self.last_update = timestamp;
         }
 
