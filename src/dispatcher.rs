@@ -119,6 +119,7 @@ struct Dispatcher {
     usage_policy: TariffColor,
     last_request: i64,
     last_update: i64,
+    last_policy_update: DateTime<Utc>,
     time_delta: TimeDelta,
     version: String,
 }
@@ -205,6 +206,7 @@ impl Dispatcher {
             usage_policy: TariffColor::Green,
             last_request: 0,
             last_update: 0,
+            last_policy_update: Default::default(),
             time_delta,
             version: config.general.version.clone(),
         })
@@ -646,14 +648,25 @@ impl Dispatcher {
     ///
     /// * 'utc_now' - 'now' according to the Utc timezone
     fn evaluate_policy(&mut self, utc_now: DateTime<Utc>) -> Result<()> {
+        let current_quarter = utc_now
+            .duration_trunc(TimeDelta::minutes(15))
+            .context("rounding error")?;
+
+        if current_quarter == self.last_policy_update
+            .duration_trunc(TimeDelta::minutes(15))
+            .context("rounding error")?
+        {
+            return Ok(());
+        }
 
         self.usage_policy = get_policy(
-            utc_now.duration_trunc(TimeDelta::minutes(15)).context("rounding error")?,
+            current_quarter,
             self.real_time_data.soc,
             &self.schedule,
             &self.policy_tariffs,
         );
-        
+
+        self.last_policy_update = utc_now;
         Ok(())
     }
     
