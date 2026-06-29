@@ -41,6 +41,13 @@ impl Inverter {
         self.get_data("load_power").await
     }
 
+    /// Asynchronous retrieves the grid power to the household
+    /// A positive result is exporting, negative is importing
+    ///
+    pub async fn get_grid_power(&self) -> Result<f64, InverterError> {
+        self.get_data("grid_power").await
+    }
+
     /// Asynchronously retrieves the photovoltaic power from the solar panels.
     ///
     pub async fn get_pv_power(&self) -> Result<f64, InverterError> {
