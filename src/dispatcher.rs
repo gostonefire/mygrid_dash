@@ -660,8 +660,7 @@ impl Dispatcher {
         }
 
         let grid_power = self.inverter.get_grid_power().await?;
-        println!("Grid power: {}", grid_power);
-        
+
         self.usage_policy = get_policy(
             current_quarter,
             self.real_time_data.soc,
