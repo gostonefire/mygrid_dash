@@ -176,8 +176,10 @@ impl Dispatcher {
                 soh: 0,
                 prod: 0.0,
                 load: 0.0,
+                grid: 0.0,
                 prod_data: VecDeque::new(),
                 load_data: VecDeque::new(),
+                grid_data: VecDeque::new(),
                 timestamp: 0,
             },
             weather_data: WeatherData {
@@ -618,12 +620,14 @@ impl Dispatcher {
         if timestamp - self.real_time_data.timestamp > 600 {
             self.real_time_data.prod_data = VecDeque::new();
             self.real_time_data.load_data = VecDeque::new();
+            self.real_time_data.grid_data = VecDeque::new();
         }
 
         self.real_time_data.soc = self.inverter.get_soc().await?;
         self.real_time_data.soh = self.inverter.get_soh().await?;
         let pv_power = self.inverter.get_pv_power().await?;
         let load_power = self.inverter.get_load_power().await?;
+        let grid_power = self.inverter.get_grid_power().await?;
 
         if self.real_time_data.prod_data.len() == 3 {
             self.real_time_data.prod_data.pop_front();
@@ -636,6 +640,12 @@ impl Dispatcher {
         }
         self.real_time_data.load_data.push_back(load_power);
         self.real_time_data.load = two_decimals(get_wma(&self.real_time_data.load_data));
+
+        if self.real_time_data.grid_data.len() == 3 {
+            self.real_time_data.grid_data.pop_front();
+        }
+        self.real_time_data.grid_data.push_back(grid_power);
+        self.real_time_data.grid = two_decimals(get_wma(&self.real_time_data.grid_data));
 
         self.real_time_data.timestamp = timestamp;
         
@@ -659,14 +669,12 @@ impl Dispatcher {
             return Ok(());
         }
 
-        let grid_power = self.inverter.get_grid_power().await?;
-
         self.usage_policy = get_policy(
             current_quarter,
             self.real_time_data.soc,
             &self.schedule,
             &self.policy_tariffs,
-            grid_power,
+            self.real_time_data.grid,
         );
 
         self.last_policy_update = utc_now;

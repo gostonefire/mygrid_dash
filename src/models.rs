@@ -69,8 +69,10 @@ pub struct RealTimeData {
     pub soh: u8,
     pub prod: f64,
     pub load: f64,
+    pub grid: f64,
     pub prod_data: VecDeque<f64>,
     pub load_data: VecDeque<f64>,
+    pub grid_data: VecDeque<f64>,
     pub timestamp: i64,
 }
 
