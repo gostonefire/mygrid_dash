@@ -353,6 +353,12 @@ impl Dispatcher {
             None
         };
 
+        let grid_description = if self.real_time_data.grid < 0.0 {
+            "Importing".to_string()
+        } else {
+            "Exporting".to_string()
+        };
+
         let reply = FullDashData {
             policy: self.usage_policy.clone(),
             temp_current: self.weather_data.temp_current,
@@ -366,7 +372,8 @@ impl Dispatcher {
                 chart_type: String::new(),
                 data: &vec![
                     DataPoint { x: "Production".to_string(), y: self.real_time_data.prod },
-                    DataPoint { x: "Load".to_string(), y: self.real_time_data.load }
+                    DataPoint { x: "Load".to_string(), y: self.real_time_data.load },
+                    DataPoint { x: grid_description, y: self.real_time_data.grid.abs() },
                 ],
             },
             current_soc_soh: Series {

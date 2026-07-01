@@ -15,7 +15,7 @@ let realtime_options = {
     legend: {
         show: false,
     },
-    colors: ["#00E396", "#FF4560"],
+    colors: ["#00E396", "#FF4560", "#008FFB"],
     stroke: {
         show: true,
         width: 2,
@@ -26,7 +26,7 @@ let realtime_options = {
     },
     plotOptions: {
         bar: {
-            columnWidth: '50%',
+            columnWidth: '75%',
             distributed: true,
             dataLabels: {
                 position: 'top',
@@ -71,7 +71,7 @@ let realtime_options = {
         enabled: false,
     },
     title: {
-        text: 'Current Production & Load',
+        text: 'Current Production, Load & Grid',
         floating: true,
         offsetY: 0,
         align: 'center',
